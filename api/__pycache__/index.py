@@ -22,6 +22,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class TopicDetailRequest(BaseModel):
+    text: str
+    topic: str
+
 class ScheduleRequest(BaseModel):
     topics: list
     exam_date: str
@@ -50,7 +54,8 @@ async def analyze_pdf(file: UploadFile = File(...)):
         reader = PdfReader(io.BytesIO(contents))
         text = ""
         
-        for page in reader.pages[:15]:
+        # We can now safely process up to 25 pages without hitting Vercel limits!
+        for page in reader.pages[:25]:
             extracted = page.extract_text()
             if extracted:
                 text += extracted + "\n"
@@ -60,25 +65,16 @@ async def analyze_pdf(file: UploadFile = File(...)):
             
         client = get_gemini_client()
         
-        # UPGRADE: Detailed Notes & Formula Extraction
+        # PHASE 1: Only extract the Topic Names (Lightning Fast)
         prompt = (
-            "You are an expert cognitive learning scientist. Analyze the following educational text. "
-            "Extract the core topics. For each topic, provide detailed bullet-point notes summarizing the concepts, "
-            "extract any mathematical, scientific, or logical formulas (if none exist, return an empty array []), "
-            "determine its importance (High, Medium, Low), and generate one Active Recall Flashcard.\n\n"
-            "Return ONLY a JSON object with this exact structure:\n"
+            "You are an AI study assistant. Read the following text and identify the 4 to 6 most important core topics. "
+            "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
             '  "topics": [\n'
-            '    {\n'
-            '      "topic": "Topic Name",\n'
-            '      "priority": "High/Medium/Low",\n'
-            '      "notes": ["Key point 1", "Key point 2"],\n'
-            '      "formulas": [{"equation": "F = ma", "meaning": "Newton\'s Second Law"}],\n'
-            '      "flashcard": {"q": "Question?", "a": "Answer."}\n'
-            '    }\n'
+            '    {"title": "Exact Topic Name"}\n'
             "  ]\n"
             "}\n\n"
-            f"Text to analyze:\n{text[:25000]}"
+            f"Text:\n{text[:30000]}"
         )
         
         response = await client.aio.models.generate_content(
@@ -86,10 +82,47 @@ async def analyze_pdf(file: UploadFile = File(...)):
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
         )
-        return json.loads(response.text)
+        
+        parsed_data = json.loads(response.text)
+        
+        # We return the extracted text back to the frontend so it can be used for Phase 2
+        return {
+            "topics": parsed_data.get("topics", []),
+            "extracted_text": text[:30000]
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"PDF Analysis failed: {str(e)}")
+
+
+@app.post("/api/topic")
+async def get_topic_details(req: TopicDetailRequest):
+    try:
+        client = get_gemini_client()
+        
+        # PHASE 2: Micro-tasking specific topic details
+        prompt = (
+            f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{req.topic}'.\n"
+            "Return ONLY a JSON object with this exact structure:\n"
+            "{\n"
+            '  "priority": "High",\n'
+            '  "notes": ["Detailed point 1", "Detailed point 2", "Detailed point 3"],\n'
+            '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist in the text for this topic)\n'
+            '  "flashcard": {"q": "Question?", "a": "Answer."}\n'
+            "}\n\n"
+            f"Text:\n{req.text}"
+        )
+        
+        response = await client.aio.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+        )
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Topic detailing failed: {str(e)}")
 
 
 @app.post("/api/schedule")
@@ -102,9 +135,8 @@ async def generate_schedule(req: ScheduleRequest):
             f"You are an expert study planner utilizing the Spaced Repetition algorithm. Create a schedule.\n"
             f"Exam Date: {req.exam_date}\n"
             f"Daily Hours: {req.study_hours}\n"
-            f"Topics: {topics_json}\n\n"
-            "Do not just list topics. Distribute them using the 'Learn, Recall, Master' spacing method. "
-            "High priority topics MUST appear on multiple days. "
+            f"Topics to map out: {topics_json}\n\n"
+            "Distribute them using the 'Learn, Recall, Master' spacing method. "
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "schedule": [\n'
@@ -112,7 +144,7 @@ async def generate_schedule(req: ScheduleRequest):
             '      "day": 1, \n'
             '      "date": "YYYY-MM-DD", \n'
             '      "focus_area": "Initial Learning vs Active Recall",\n'
-            '      "topics_to_study": ["Topic 1"], \n'
+            '      "topics_to_study": ["Topic Name 1"], \n'
             '      "hours_allocated": 2.5, \n'
             '      "actionable_advice": "Specific study technique to use today"\n'
             '    }\n'

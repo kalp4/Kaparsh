@@ -50,13 +50,10 @@
             color: #818cf8;
             border-bottom: 2px solid #818cf8;
         }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .dark ::-webkit-scrollbar-thumb { background: #475569; }
-        
-        /* Hide details marker */
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
     </style>
@@ -105,7 +102,7 @@
                     <div id="drop-zone" class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center transition hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
                         <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-3"></i>
                         <p class="text-sm text-slate-600 dark:text-slate-300 mb-1 font-medium">Click or drag PDF to upload</p>
-                        <p id="file-name" class="text-xs text-slate-400">Max size: 15 pages recommended</p>
+                        <p id="file-name" class="text-xs text-slate-400">Upload up to 25 pages!</p>
                         <input type="file" id="file-upload" accept=".pdf" class="hidden">
                     </div>
                 </div>
@@ -137,7 +134,7 @@
                 <!-- Global Loader -->
                 <div id="global-loader" class="hidden flex-1 flex flex-col items-center justify-center p-12">
                     <div class="loader w-12 h-12 border-4 border-slate-200 rounded-full mb-4"></div>
-                    <p id="loader-text" class="text-slate-500 font-medium animate-pulse">Processing document...</p>
+                    <p id="loader-text" class="text-slate-500 font-medium animate-pulse">Reading document framework...</p>
                 </div>
 
                 <!-- Empty State -->
@@ -146,7 +143,7 @@
                         <i class="fa-solid fa-brain text-4xl text-brand-500"></i>
                     </div>
                     <h3 class="text-xl font-bold mb-2">Awaiting Instructions</h3>
-                    <p class="text-slate-500 max-w-md">Upload your syllabus or study notes PDF to let EduCoPilot generate your structured notes, highlighted formulas, and study plan.</p>
+                    <p class="text-slate-500 max-w-md">Upload your syllabus or textbook PDF (up to 25 pages!) to let EduCoPilot generate your structured notes, highlighted formulas, and study plan.</p>
                 </div>
 
                 <!-- Tab Contents Area -->
@@ -208,17 +205,16 @@
     <script>
         // --- State Management ---
         const AppState = {
+            extractedText: "",
             topics: null,
             schedule: null,
             quiz: null,
             file: null
         };
 
-        // --- Theme Management ---
         const themeBtn = document.getElementById('theme-toggle');
         const htmlElement = document.documentElement;
         
-        // Setup initial exam date to tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 7);
         document.getElementById('exam-date').valueAsDate = tomorrow;
@@ -233,16 +229,8 @@
         const fileNameDisplay = document.getElementById('file-name');
 
         dropZone.addEventListener('click', () => fileInput.click());
-        
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('drag-active');
-        });
-
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-active'); });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('drag-active');
@@ -269,16 +257,13 @@
         tabBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 if (!AppState.topics) return; 
-
                 tabBtns.forEach(b => b.classList.remove('tab-active', 'text-brand-600', 'dark:text-brand-400'));
                 btn.classList.add('tab-active');
-
                 tabPanes.forEach(pane => pane.classList.add('hidden'));
                 document.getElementById(btn.dataset.target).classList.remove('hidden');
             });
         });
 
-        // --- UI Helpers ---
         const toggleLoader = (show, text = 'Processing...') => {
             document.getElementById('loader-text').innerText = text;
             if (show) {
@@ -300,19 +285,18 @@
             }
         };
 
-        // --- Step 1: Analyze PDF ---
+        // --- Step 1: Analyze PDF (Phase 1 & Phase 2 Micro-Tasking) ---
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF file.");
 
-            toggleLoader(true, 'Extracting notes, formulas & flashcards...');
+            toggleLoader(true, 'Scanning document and extracting framework...');
 
             const formData = new FormData();
             formData.append('file', AppState.file);
 
             try {
+                // PHASE 1: Fast extraction of Topic Names
                 const response = await fetch('/api/analyze', { method: 'POST', body: formData });
-                
-                // Read raw text first to catch Vercel timeouts or empty responses
                 const rawText = await response.text();
                 
                 if (!response.ok) {
@@ -324,19 +308,24 @@
                     }
                 }
                 
-                if (!rawText) {
-                    throw new Error("The server returned an empty response. The AI request likely timed out.");
-                }
-
-                // Parse the verified JSON
                 const data = JSON.parse(rawText);
-                AppState.topics = data.topics;
-                renderTopics();
+                AppState.extractedText = data.extracted_text;
                 
-                // Switch to summary tab automatically
+                // Initialize topics with a "loaded: false" state for the skeleton UI
+                AppState.topics = data.topics.map(t => ({ title: t.title, loaded: false }));
+                
+                // Show the UI immediately with skeleton cards
+                renderTopics();
                 tabBtns[0].click();
                 toggleLoader(false);
                 
+                // PHASE 2: Micro-tasking sequential loads to bypass Vercel Limits
+                for (let i = 0; i < AppState.topics.length; i++) {
+                    await fetchTopicDetails(i);
+                    // Add a small 1-second delay to guarantee we stay perfectly under Google's 15 RPM limit
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
                 // Reset schedule and quiz states
                 AppState.schedule = null;
                 AppState.quiz = null;
@@ -350,12 +339,55 @@
             }
         });
 
+        // Fetches detailed notes for a single topic
+        async function fetchTopicDetails(index) {
+            const topic = AppState.topics[index];
+            try {
+                const response = await fetch('/api/topic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: AppState.extractedText,
+                        topic: topic.title
+                    })
+                });
+                
+                if (response.ok) {
+                    const details = await response.json();
+                    AppState.topics[index] = { ...topic, ...details, loaded: true };
+                    renderTopics(); // Re-render to show the loaded data
+                }
+            } catch (e) {
+                console.error("Failed to load details for", topic.title);
+            }
+        }
+
         function renderTopics() {
             const grid = document.getElementById('topics-grid');
             document.getElementById('topic-count').innerText = `${AppState.topics.length} Topics`;
             
             grid.innerHTML = AppState.topics.map(t => {
-                // Priority Badge Styling
+                
+                // 1. Render Skeleton State if not loaded yet
+                if (!t.loaded) {
+                    return `
+                    <div class="bg-white dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-pulse">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-bold text-xl text-slate-900 dark:text-white pr-2">${t.title}</h4>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-brand-500">AI Processing...</span>
+                                <div class="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mt-6">
+                            <div class="h-2 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+                            <div class="h-2 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                            <div class="h-2 bg-slate-200 dark:bg-slate-700 rounded w-5/6"></div>
+                        </div>
+                    </div>`;
+                }
+
+                // 2. Render Fully Loaded State
                 const priorityColors = {
                     'High': 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
                     'Medium': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
@@ -363,10 +395,8 @@
                 };
                 const pColor = priorityColors[t.priority] || priorityColors['Medium'];
                 
-                // Notes List Generation
                 const notesList = t.notes.map(n => `<li class="mb-2 flex items-start"><i class="fa-solid fa-angle-right text-brand-500 mt-1 mr-3 text-xs"></i><span class="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">${n}</span></li>`).join('');
 
-                // Formula Highlight Generation (Only displays if formulas exist)
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
                     <div class="my-4 space-y-3">
                         ${t.formulas.map(f => `
@@ -386,7 +416,7 @@
                 return `
                 <div class="bg-white dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 transition shadow-sm">
                     <div class="flex justify-between items-start mb-4">
-                        <h4 class="font-bold text-xl text-slate-900 dark:text-white pr-2">${t.topic}</h4>
+                        <h4 class="font-bold text-xl text-slate-900 dark:text-white pr-2">${t.title}</h4>
                         <span class="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${pColor}">${t.priority}</span>
                     </div>
                     
@@ -416,8 +446,10 @@
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
-
             if (!examDate) return alert("Please set an exam date in the configuration sidebar.");
+
+            // Filter out any topics that failed to load to prevent sending broken data
+            const loadedTopics = AppState.topics.filter(t => t.loaded);
 
             toggleLoader(true, 'Calculating Spaced Repetition algorithm...');
 
@@ -426,26 +458,14 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        topics: AppState.topics,
+                        topics: loadedTopics,
                         exam_date: examDate,
                         study_hours: parseFloat(studyHours)
                     })
                 });
                 
                 const rawText = await response.text();
-                
-                if (!response.ok) {
-                    try {
-                        const errJson = JSON.parse(rawText);
-                        throw new Error(errJson.detail || "Server Error");
-                    } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
-                    }
-                }
-                
-                if (!rawText) {
-                    throw new Error("The server returned an empty response. The AI request likely timed out.");
-                }
+                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
                 
                 const data = JSON.parse(rawText);
                 AppState.schedule = data.schedule;
@@ -491,30 +511,19 @@
         // --- Step 3: Generate Quiz ---
         async function generateQuiz() {
             toggleLoader(true, 'Crafting tricky distractors & final exam...');
+            const loadedTopics = AppState.topics.filter(t => t.loaded);
 
             try {
                 const response = await fetch('/api/quiz', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        topics: AppState.topics
+                        topics: loadedTopics
                     })
                 });
                 
                 const rawText = await response.text();
-                
-                if (!response.ok) {
-                    try {
-                        const errJson = JSON.parse(rawText);
-                        throw new Error(errJson.detail || "Server Error");
-                    } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
-                    }
-                }
-                
-                if (!rawText) {
-                    throw new Error("The server returned an empty response. The AI request likely timed out.");
-                }
+                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
                 
                 const data = JSON.parse(rawText);
                 AppState.quiz = data.quiz;
@@ -584,9 +593,7 @@
                 }
             });
             
-            // Show total score if all are answered
-            const totalAnswered = document.querySelectorAll('input[type="radio"]:checked').length;
-            if(totalAnswered === AppState.quiz.length) {
+            if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
                 const percentage = (score / AppState.quiz.length) * 100;
                 let message = percentage === 100 ? "Perfect Score! Masterful execution. 🎉" : (percentage >= 60 ? "Great Job! Review the distractors above. 👍" : "Time for Spaced Repetition! Let's review the flashcards. 📚");
                 
