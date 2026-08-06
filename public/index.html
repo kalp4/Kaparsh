@@ -311,16 +311,25 @@
 
             try {
                 const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                
+                // Read raw text first to catch Vercel timeouts or empty responses
+                const rawText = await response.text();
+                
                 if (!response.ok) {
-                    const errText = await response.text();
                     try {
-                        const errJson = JSON.parse(errText);
+                        const errJson = JSON.parse(rawText);
                         throw new Error(errJson.detail || "Server Error");
                     } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
                     }
                 }
-                const data = await response.json();
+                
+                if (!rawText) {
+                    throw new Error("The server returned an empty response. The AI request likely timed out.");
+                }
+
+                // Parse the verified JSON
+                const data = JSON.parse(rawText);
                 AppState.topics = data.topics;
                 renderTopics();
                 
@@ -423,17 +432,22 @@
                     })
                 });
                 
+                const rawText = await response.text();
+                
                 if (!response.ok) {
-                    const errText = await response.text();
                     try {
-                        const errJson = JSON.parse(errText);
+                        const errJson = JSON.parse(rawText);
                         throw new Error(errJson.detail || "Server Error");
                     } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
                     }
                 }
                 
-                const data = await response.json();
+                if (!rawText) {
+                    throw new Error("The server returned an empty response. The AI request likely timed out.");
+                }
+                
+                const data = JSON.parse(rawText);
                 AppState.schedule = data.schedule;
                 renderSchedule();
                 
@@ -487,17 +501,22 @@
                     })
                 });
                 
+                const rawText = await response.text();
+                
                 if (!response.ok) {
-                    const errText = await response.text();
                     try {
-                        const errJson = JSON.parse(errText);
+                        const errJson = JSON.parse(rawText);
                         throw new Error(errJson.detail || "Server Error");
                     } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
                     }
                 }
                 
-                const data = await response.json();
+                if (!rawText) {
+                    throw new Error("The server returned an empty response. The AI request likely timed out.");
+                }
+                
+                const data = JSON.parse(rawText);
                 AppState.quiz = data.quiz;
                 renderQuiz();
                 
