@@ -312,8 +312,13 @@
             try {
                 const response = await fetch('/api/analyze', { method: 'POST', body: formData });
                 if (!response.ok) {
-                    const errText = await response.json();
-                    throw new Error(errText.detail || "Server Error");
+                    const errText = await response.text();
+                    try {
+                        const errJson = JSON.parse(errText);
+                        throw new Error(errJson.detail || "Server Error");
+                    } catch (parseErr) {
+                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                    }
                 }
                 const data = await response.json();
                 AppState.topics = data.topics;
@@ -418,7 +423,15 @@
                     })
                 });
                 
-                if (!response.ok) throw new Error(await response.text());
+                if (!response.ok) {
+                    const errText = await response.text();
+                    try {
+                        const errJson = JSON.parse(errText);
+                        throw new Error(errJson.detail || "Server Error");
+                    } catch (parseErr) {
+                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                    }
+                }
                 
                 const data = await response.json();
                 AppState.schedule = data.schedule;
@@ -474,7 +487,15 @@
                     })
                 });
                 
-                if (!response.ok) throw new Error(await response.text());
+                if (!response.ok) {
+                    const errText = await response.text();
+                    try {
+                        const errJson = JSON.parse(errText);
+                        throw new Error(errJson.detail || "Server Error");
+                    } catch (parseErr) {
+                        throw new Error(`Network Error (${response.status}): The backend could not be reached or timed out.`);
+                    }
+                }
                 
                 const data = await response.json();
                 AppState.quiz = data.quiz;
