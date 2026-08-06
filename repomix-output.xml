@@ -1,0 +1,779 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: data/**, backups/**
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+api/
+  index.py
+public/
+  index.html
+requirements.txt
+vercel.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="api/index.py">
+import io
+import json
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from pypdf import PdfReader
+from google import genai
+from google.genai import types
+
+app = FastAPI(title="EduCoPilot API")
+
+# Enable CORS for frontend integration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- Pydantic Models for Request Validation ---
+
+class ScheduleRequest(BaseModel):
+    topics: list
+    exam_date: str
+    study_hours: float
+    api_key: str
+
+class QuizRequest(BaseModel):
+    topics: list
+    api_key: str
+
+# --- Helper Function ---
+
+def get_gemini_client(api_key: str):
+    """Instantiates the Gemini client with the provided API key."""
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Gemini API Key is required.")
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid API Key or Client Error: {str(e)}")
+
+# --- Endpoints ---
+
+@app.post("/api/analyze")
+async def analyze_pdf(
+    file: UploadFile = File(...),
+    api_key: str = Form(...)
+):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        
+    try:
+        contents = await file.read()
+        reader = PdfReader(io.BytesIO(contents))
+        text = ""
+        
+        # Limit to the first 15 pages to ensure it stays within serverless timeouts and context windows
+        for page in reader.pages[:15]:
+            extracted = page.extract_text()
+            if extracted:
+                text += extracted + "\n"
+                
+        if not text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract any readable text from the provided PDF.")
+            
+        client = get_gemini_client(api_key)
+        
+        prompt = (
+            "You are an expert AI study assistant. Analyze the following educational text "
+            "and extract the core topics. Provide a clear, concise definition for each topic.\n\n"
+            "Return ONLY a JSON object with this exact structure (no markdown blocks, no extra text):\n"
+            "{\n"
+            '  "topics": [\n'
+            '    {"topic": "Topic Name", "definition": "Clear explanation of the topic"}\n'
+            "  ]\n"
+            "}\n\n"
+            f"Text to analyze:\n{text[:25000]}"
+        )
+        
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.2,
+            )
+        )
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF Analysis failed: {str(e)}")
+
+
+@app.post("/api/schedule")
+async def generate_schedule(req: ScheduleRequest):
+    try:
+        client = get_gemini_client(req.api_key)
+        topics_json = json.dumps(req.topics)
+        
+        prompt = (
+            f"You are an expert study planner. Create a day-by-day revision schedule.\n"
+            f"Exam Date: {req.exam_date}\n"
+            f"Daily Study Hours available: {req.study_hours}\n"
+            f"Topics to cover: {topics_json}\n\n"
+            "Distribute the topics logically over the days leading up to the exam. "
+            "Return ONLY a JSON object with this exact structure (no markdown blocks):\n"
+            "{\n"
+            '  "schedule": [\n'
+            '    {"day": 1, "date": "YYYY-MM-DD", "topics_to_study": ["Topic 1", "Topic 2"], "hours_allocated": 2.5, "strategy": "Active recall..."}\n'
+            "  ]\n"
+            "}"
+        )
+        
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.3,
+            )
+        )
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}")
+
+
+@app.post("/api/quiz")
+async def generate_quiz(req: QuizRequest):
+    try:
+        client = get_gemini_client(req.api_key)
+        topics_json = json.dumps(req.topics)
+        
+        prompt = (
+            "You are an expert educator. Create 3 multiple-choice practice questions based on these topics to test the student's understanding.\n"
+            f"Topics: {topics_json}\n\n"
+            "Return ONLY a JSON object with this exact structure (no markdown blocks):\n"
+            "{\n"
+            '  "quiz": [\n'
+            '    {\n'
+            '      "question": "What is...?",\n'
+            '      "options": ["A", "B", "C", "D"],\n'
+            '      "correct_answer": "The exact string of the correct option (e.g., A)",\n'
+            '      "explanation": "Why this is correct..."\n'
+            '    }\n'
+            "  ]\n"
+            "}"
+        )
+        
+        response = await client.aio.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.3,
+            )
+        )
+        
+        return json.loads(response.text)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quiz generation failed: {str(e)}")
+
+if os.path.exists("public"):
+    app.mount("/", StaticFiles(directory="public", html=True), name="static")
+</file>
+
+<file path="public/index.html">
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduCoPilot — AI Study & Revision Agent</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            900: '#312e81',
+                        },
+                        darkBg: '#0f172a',
+                        darkSurface: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .loader {
+            border-top-color: #6366f1;
+            -webkit-animation: spinner 1s linear infinite;
+            animation: spinner 1s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .drag-active {
+            border-color: #6366f1 !important;
+            background-color: rgba(99, 102, 241, 0.1) !important;
+        }
+        .tab-active {
+            border-bottom: 2px solid #6366f1;
+            color: #6366f1;
+        }
+        .dark .tab-active {
+            color: #818cf8;
+            border-bottom: 2px solid #818cf8;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-darkBg dark:text-slate-100 min-h-screen transition-colors duration-300 font-sans selection:bg-brand-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-white/70 dark:bg-darkBg/70 backdrop-blur-lg border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">Edu<span class="text-brand-600 dark:text-brand-500">CoPilot</span></h1>
+            </div>
+            <button id="theme-toggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+                <i class="fa-solid fa-moon dark:hidden text-slate-600"></i>
+                <i class="fa-solid fa-sun hidden dark:block text-slate-300"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout Grid -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Sidebar: Configuration & Upload -->
+        <aside class="lg:col-span-4 flex flex-col gap-6">
+            <div class="bg-white dark:bg-darkSurface rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                <h2 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fa-solid fa-sliders text-brand-500"></i> Configuration</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Gemini API Key</label>
+                        <input type="password" id="api-key" placeholder="AIzaSy..." class="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-brand-500 outline-none transition">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Exam Date</label>
+                            <input type="date" id="exam-date" class="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-600 dark:text-slate-400">Hours / Day</label>
+                            <input type="number" id="study-hours" value="2" min="1" max="16" class="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:ring-2 focus:ring-brand-500 outline-none transition text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t border-slate-200 dark:border-slate-800 pt-6">
+                    <label class="block text-sm font-medium mb-2 text-slate-600 dark:text-slate-400">Study Material (PDF)</label>
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center transition hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-3"></i>
+                        <p class="text-sm text-slate-600 dark:text-slate-300 mb-1 font-medium">Click or drag PDF to upload</p>
+                        <p id="file-name" class="text-xs text-slate-400">Max size: 15 pages recommended</p>
+                        <input type="file" id="file-upload" accept=".pdf" class="hidden">
+                    </div>
+                </div>
+
+                <button id="analyze-btn" class="w-full mt-6 bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 px-4 rounded-xl transition shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2">
+                    <span>Extract & Analyze</span>
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Right Panel: Tabs & Results -->
+        <section class="lg:col-span-8">
+            <div class="bg-white dark:bg-darkSurface rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 min-h-[600px] flex flex-col overflow-hidden">
+                
+                <!-- Tab Headers -->
+                <div class="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-darkBg/50">
+                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition tab-active" data-target="tab-summary">
+                        <i class="fa-solid fa-book-open mr-2"></i> Key Topics
+                    </button>
+                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition" data-target="tab-schedule">
+                        <i class="fa-solid fa-calendar-day mr-2"></i> Study Schedule
+                    </button>
+                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition" data-target="tab-quiz">
+                        <i class="fa-solid fa-stopwatch mr-2"></i> Practice Quiz
+                    </button>
+                </div>
+
+                <!-- Global Loader -->
+                <div id="global-loader" class="hidden flex-1 flex flex-col items-center justify-center p-12">
+                    <div class="loader w-12 h-12 border-4 border-slate-200 rounded-full mb-4"></div>
+                    <p id="loader-text" class="text-slate-500 font-medium animate-pulse">Analyzing document...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="flex-1 flex flex-col items-center justify-center p-12 text-center">
+                    <div class="w-24 h-24 bg-brand-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa-solid fa-robot text-4xl text-brand-500"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Awaiting Instructions</h3>
+                    <p class="text-slate-500 max-w-md">Upload your syllabus or study notes PDF and provide your Gemini API key to let EduCoPilot generate your personalized study assets.</p>
+                </div>
+
+                <!-- Tab Contents Area -->
+                <div id="tabs-container" class="hidden flex-1 p-6 overflow-y-auto">
+                    
+                    <!-- Tab 1: Summary -->
+                    <div id="tab-summary" class="tab-pane block">
+                        <div class="flex justify-between items-end mb-6">
+                            <div>
+                                <h2 class="text-2xl font-bold">Extracted Topics</h2>
+                                <p class="text-sm text-slate-500 mt-1">Core concepts identified from your PDF.</p>
+                            </div>
+                            <span id="topic-count" class="px-3 py-1 bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-400 text-sm font-bold rounded-full"></span>
+                        </div>
+                        <div id="topics-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Schedule -->
+                    <div id="tab-schedule" class="tab-pane hidden">
+                        <div id="schedule-setup" class="text-center py-16">
+                            <i class="fa-regular fa-calendar-check text-5xl text-slate-300 dark:text-slate-600 mb-4"></i>
+                            <h3 class="text-xl font-bold mb-2">Build Your Revision Plan</h3>
+                            <p class="text-slate-500 mb-6 max-w-sm mx-auto">We'll strategically distribute your extracted topics across the days leading up to your exam.</p>
+                            <button onclick="generateSchedule()" class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition shadow-lg shadow-brand-500/20">
+                                Generate Smart Schedule
+                            </button>
+                        </div>
+                        <div id="schedule-result" class="hidden space-y-4">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Tab 3: Quiz -->
+                    <div id="tab-quiz" class="tab-pane hidden">
+                        <div id="quiz-setup" class="text-center py-16">
+                            <i class="fa-solid fa-list-check text-5xl text-slate-300 dark:text-slate-600 mb-4"></i>
+                            <h3 class="text-xl font-bold mb-2">Test Your Knowledge</h3>
+                            <p class="text-slate-500 mb-6 max-w-sm mx-auto">Generate a custom multiple-choice quiz based directly on your study material to identify weak areas.</p>
+                            <button onclick="generateQuiz()" class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl transition shadow-lg shadow-brand-500/20">
+                                Create Practice Quiz
+                            </button>
+                        </div>
+                        <div id="quiz-result" class="hidden space-y-6">
+                            <div id="quiz-questions-container" class="space-y-6"></div>
+                            <button onclick="checkAnswers()" class="w-full py-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold rounded-xl mt-6 hover:opacity-90 transition">
+                                Submit & Check Answers
+                            </button>
+                            <div id="quiz-score-area"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // --- State Management ---
+        const AppState = {
+            topics: null,
+            schedule: null,
+            quiz: null,
+            apiKey: '',
+            file: null
+        };
+
+        // --- Theme Management ---
+        const themeBtn = document.getElementById('theme-toggle');
+        const htmlElement = document.documentElement;
+        
+        // Setup initial exam date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 7);
+        document.getElementById('exam-date').valueAsDate = tomorrow;
+
+        themeBtn.addEventListener('click', () => {
+            htmlElement.classList.toggle('dark');
+        });
+
+        // --- Drag & Drop ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-upload');
+        const fileNameDisplay = document.getElementById('file-name');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            if (fileInput.files.length > 0) {
+                AppState.file = fileInput.files[0];
+                fileNameDisplay.textContent = AppState.file.name;
+                fileNameDisplay.classList.add('text-brand-600', 'dark:text-brand-400', 'font-medium');
+            }
+        }
+
+        // --- Tab Management ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!AppState.topics) return; // Prevent switching if no data
+
+                tabBtns.forEach(b => b.classList.remove('tab-active', 'text-brand-600', 'dark:text-brand-400'));
+                btn.classList.add('tab-active');
+
+                tabPanes.forEach(pane => pane.classList.add('hidden'));
+                document.getElementById(btn.dataset.target).classList.remove('hidden');
+            });
+        });
+
+        // --- UI Helpers ---
+        const toggleLoader = (show, text = 'Processing...') => {
+            document.getElementById('loader-text').innerText = text;
+            if (show) {
+                document.getElementById('empty-state').classList.add('hidden');
+                document.getElementById('tabs-container').classList.add('hidden');
+                document.getElementById('global-loader').classList.remove('hidden');
+            } else {
+                document.getElementById('global-loader').classList.add('hidden');
+                document.getElementById('tabs-container').classList.remove('hidden');
+            }
+        };
+
+        const showError = (msg) => {
+            alert("Error: " + msg);
+            toggleLoader(false);
+            if (!AppState.topics) {
+                document.getElementById('tabs-container').classList.add('hidden');
+                document.getElementById('empty-state').classList.remove('hidden');
+            }
+        };
+
+        // --- Step 1: Analyze PDF ---
+        document.getElementById('analyze-btn').addEventListener('click', async () => {
+            AppState.apiKey = document.getElementById('api-key').value;
+            
+            if (!AppState.apiKey) return alert("Please enter your Gemini API Key.");
+            if (!AppState.file) return alert("Please upload a PDF file.");
+
+            toggleLoader(true, 'Extracting & analyzing topics...');
+
+            const formData = new FormData();
+            formData.append('file', AppState.file);
+            formData.append('api_key', AppState.apiKey);
+
+            try {
+                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errText = await response.json();
+                    throw new Error(errText.detail || "Server Error");
+                }
+                const data = await response.json();
+                AppState.topics = data.topics;
+                renderTopics();
+                
+                // Switch to summary tab automatically
+                tabBtns[0].click();
+                toggleLoader(false);
+                
+                // Reset schedule and quiz states
+                AppState.schedule = null;
+                AppState.quiz = null;
+                document.getElementById('schedule-result').classList.add('hidden');
+                document.getElementById('schedule-setup').classList.remove('hidden');
+                document.getElementById('quiz-result').classList.add('hidden');
+                document.getElementById('quiz-setup').classList.remove('hidden');
+
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        function renderTopics() {
+            const grid = document.getElementById('topics-grid');
+            document.getElementById('topic-count').innerText = `${AppState.topics.length} Topics`;
+            grid.innerHTML = AppState.topics.map(t => `
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-brand-300 transition">
+                    <h4 class="font-bold text-lg mb-2 text-slate-900 dark:text-white">${t.topic}</h4>
+                    <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">${t.definition}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- Step 2: Generate Schedule ---
+        async function generateSchedule() {
+            const examDate = document.getElementById('exam-date').value;
+            const studyHours = document.getElementById('study-hours').value;
+
+            if (!examDate) return alert("Please set an exam date in the configuration sidebar.");
+
+            toggleLoader(true, 'Structuring your study plan...');
+
+            try {
+                const response = await fetch('/api/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topics: AppState.topics,
+                        exam_date: examDate,
+                        study_hours: parseFloat(studyHours),
+                        api_key: AppState.apiKey
+                    })
+                });
+                
+                if (!response.ok) throw new Error(await response.text());
+                
+                const data = await response.json();
+                AppState.schedule = data.schedule;
+                renderSchedule();
+                
+                document.getElementById('schedule-setup').classList.add('hidden');
+                document.getElementById('schedule-result').classList.remove('hidden');
+                toggleLoader(false);
+
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        function renderSchedule() {
+            const container = document.getElementById('schedule-result');
+            container.innerHTML = AppState.schedule.map(day => `
+                <div class="flex gap-4 p-5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 relative overflow-hidden">
+                    <div class="w-2 bg-brand-500 absolute left-0 top-0 bottom-0"></div>
+                    <div class="flex-shrink-0 text-center px-4 border-r border-slate-200 dark:border-slate-700 flex flex-col justify-center">
+                        <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Day ${day.day}</span>
+                        <span class="text-lg font-bold text-slate-900 dark:text-white">${day.date.split('-').slice(1).join('/')}</span>
+                    </div>
+                    <div class="flex-1 py-1">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-semibold text-slate-800 dark:text-slate-200">Topics to Cover</h4>
+                            <span class="text-xs font-medium bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-slate-600 dark:text-slate-300"><i class="fa-regular fa-clock mr-1"></i>${day.hours_allocated} hrs</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            ${day.topics_to_study.map(t => `<span class="text-xs px-2 py-1 bg-brand-50 dark:bg-brand-900/30 border border-brand-100 dark:border-brand-800 text-brand-700 dark:text-brand-300 rounded-md">${t}</span>`).join('')}
+                        </div>
+                        <p class="text-sm text-slate-600 dark:text-slate-400"><i class="fa-solid fa-lightbulb text-yellow-500 mr-2"></i><strong>Strategy:</strong> ${day.strategy}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- Step 3: Generate Quiz ---
+        async function generateQuiz() {
+            toggleLoader(true, 'Crafting practice questions...');
+
+            try {
+                const response = await fetch('/api/quiz', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topics: AppState.topics,
+                        api_key: AppState.apiKey
+                    })
+                });
+                
+                if (!response.ok) throw new Error(await response.text());
+                
+                const data = await response.json();
+                AppState.quiz = data.quiz;
+                renderQuiz();
+                
+                document.getElementById('quiz-setup').classList.add('hidden');
+                document.getElementById('quiz-result').classList.remove('hidden');
+                toggleLoader(false);
+
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        function renderQuiz() {
+            const container = document.getElementById('quiz-questions-container');
+            document.getElementById('quiz-score-area').innerHTML = ''; // reset score
+
+            container.innerHTML = AppState.quiz.map((q, index) => `
+                <div id="qcard-${index}" class="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 transition duration-300">
+                    <h4 class="font-bold text-lg mb-4 text-slate-900 dark:text-white"><span class="text-brand-500 mr-2">Q${index + 1}.</span> ${q.question}</h4>
+                    <div class="space-y-3 pl-6">
+                        ${q.options.map((opt, oIndex) => `
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-4 h-4 text-brand-600 focus:ring-brand-500 border-gray-300 dark:border-gray-600 dark:bg-slate-700">
+                                <span class="text-slate-700 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white transition">${opt}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                    <div id="result-${index}" class="mt-4"></div>
+                </div>
+            `).join('');
+        }
+
+        function checkAnswers() {
+            let score = 0;
+            AppState.quiz.forEach((q, index) => {
+                const selected = document.querySelector(`input[name="question-${index}"]:checked`);
+                const resultDiv = document.getElementById(`result-${index}`);
+                const card = document.getElementById(`qcard-${index}`);
+                
+                if (!selected) {
+                    resultDiv.innerHTML = `<span class="text-amber-500 text-sm font-medium"><i class="fas fa-exclamation-triangle mr-1"></i> Please select an answer.</span>`;
+                    return;
+                }
+                
+                if (selected.value === q.correct_answer) {
+                    score++;
+                    resultDiv.innerHTML = `
+                        <div class="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800/50">
+                            <p class="text-green-700 dark:text-green-400 font-bold flex items-center"><i class="fas fa-check-circle mr-2"></i> Correct</p>
+                            <p class="text-sm mt-2 text-green-800 dark:text-green-200 opacity-90">${q.explanation}</p>
+                        </div>`;
+                    card.classList.add('border-green-500', 'dark:border-green-500');
+                    card.classList.remove('border-red-500', 'dark:border-red-500', 'border-slate-200', 'dark:border-slate-700');
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/50">
+                            <p class="text-red-700 dark:text-red-400 font-bold flex items-center"><i class="fas fa-times-circle mr-2"></i> Incorrect</p>
+                            <p class="text-sm mt-2 text-slate-700 dark:text-slate-300">Correct Answer: <strong class="font-semibold text-slate-900 dark:text-white">${q.correct_answer}</strong></p>
+                            <p class="text-sm mt-2 text-red-800 dark:text-red-200 opacity-90">${q.explanation}</p>
+                        </div>`;
+                    card.classList.add('border-red-500', 'dark:border-red-500');
+                    card.classList.remove('border-green-500', 'dark:border-green-500', 'border-slate-200', 'dark:border-slate-700');
+                }
+            });
+            
+            // Show total score if all are answered
+            const totalAnswered = document.querySelectorAll('input[type="radio"]:checked').length;
+            if(totalAnswered === AppState.quiz.length) {
+                const percentage = (score / AppState.quiz.length) * 100;
+                let message = percentage === 100 ? "Perfect Score! 🎉" : (percentage >= 66 ? "Great Job! 👍" : "Keep Reviewing! 📚");
+                
+                document.getElementById('quiz-score-area').innerHTML = `
+                    <div class="mt-8 p-6 bg-gradient-to-r from-brand-500 to-purple-600 rounded-xl text-center text-white shadow-xl">
+                        <h3 class="text-2xl font-bold mb-1">${score} / ${AppState.quiz.length} Correct</h3>
+                        <p class="text-brand-100 font-medium">${message}</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+</file>
+
+<file path="requirements.txt">
+fastapi
+python-multipart
+pypdf
+google-genai
+uvicorn
+</file>
+
+<file path="vercel.json">
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 60
+      }
+    },
+    {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/index.html"
+    }
+  ]
+}
+</file>
+
+</files>
