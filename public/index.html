@@ -47,8 +47,6 @@
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
     </style>
 </head>
 <body class="bg-white text-neutral-900 min-h-screen font-sans selection:bg-neutral-200 selection:text-black">
@@ -132,7 +130,7 @@
                         <i class="fa-solid fa-layer-group text-2xl text-neutral-400"></i>
                     </div>
                     <h3 class="text-lg font-bold text-black mb-1">Workspace Ready</h3>
-                    <p class="text-sm text-neutral-500 max-w-sm">Upload a document to extract highly structured notes, formulas, and cognitive flashcards.</p>
+                    <p class="text-sm text-neutral-500 max-w-sm">Upload a document to extract highly structured notes, formulas, and cognitive analogies.</p>
                 </div>
 
                 <!-- Tab Contents Area -->
@@ -392,17 +390,11 @@
                     
                     ${formulasHtml}
                     
-                    <div class="mt-5 pt-4 border-t border-neutral-100">
-                        <details class="group bg-neutral-50 rounded-lg overflow-hidden border border-neutral-200">
-                            <summary class="p-3 text-xs font-bold uppercase tracking-wider cursor-pointer flex justify-between items-center text-neutral-600 hover:text-black transition">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-bolt text-neutral-400"></i> Active Recall</span>
-                                <i class="fa-solid fa-chevron-down transition-transform group-open:rotate-180"></i>
-                            </summary>
-                            <div class="p-4 border-t border-neutral-200 bg-white">
-                                <p class="text-sm text-black font-semibold mb-2"><span class="text-neutral-400 mr-1">Q:</span> ${t.flashcard.q}</p>
-                                <p class="text-sm text-neutral-600"><span class="font-bold text-neutral-300 mr-1">A:</span> ${t.flashcard.a}</p>
-                            </div>
-                        </details>
+                    <div class="mt-5 pt-5 border-t border-neutral-100">
+                        <div class="bg-neutral-50 p-4 rounded-lg border border-neutral-200">
+                            <p class="text-[10px] uppercase font-bold text-neutral-400 mb-2 tracking-wider"><i class="fa-solid fa-lightbulb mr-1"></i> Real-World Analogy</p>
+                            <p class="text-sm text-neutral-700 leading-relaxed">${t.analogy}</p>
+                        </div>
                     </div>
                 </div>
             `}).join('');

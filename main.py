@@ -59,7 +59,6 @@ def analyze_pdf():
             f"Text:\n{text[:30000]}"
         )
         
-        # Note: Flask uses standard synchronous calls, so we remove the .aio from the client
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
@@ -90,7 +89,7 @@ def get_topic_details():
             '  "priority": "High",\n'
             '  "notes": ["Detailed point 1", "Detailed point 2", "Detailed point 3"],\n'
             '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist in the text for this topic)\n'
-            '  "flashcard": {"q": "Question?", "a": "Answer."}\n'
+            '  "analogy": "A simple, highly effective real-world analogy explaining this concept to a beginner."\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"
         )
@@ -180,5 +179,3 @@ def generate_quiz():
         
     except Exception as e:
         return jsonify({"detail": f"Quiz generation failed: {str(e)}"}), 500
-
-# Do not run app.run() here; Vercel handles serving the 'app' object natively.
