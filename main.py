@@ -31,23 +31,41 @@ def analyze_pdf():
         return jsonify({"detail": "No file uploaded."}), 400
         
     file = request.files['file']
-    if file.filename == '' or not file.filename.lower().endswith(".pdf"):
-        return jsonify({"detail": "Only PDF files are supported."}), 400
+    filename = file.filename.lower()
+    
+    if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+        return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
         
     try:
-        reader = PdfReader(file)
+        client = get_gemini_client()
         text = ""
         
-        for page in reader.pages[:25]:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted + "\n"
+        # Handle PDF Extraction
+        if filename.endswith(".pdf"):
+            reader = PdfReader(file)
+            for page in reader.pages[:25]:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+                    
+        # Handle Image Extraction natively using Gemini
+        else:
+            image_bytes = file.read()
+            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            
+            transcription_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=[
+                    "You are a highly accurate Optical Character Recognition (OCR) system. Transcribe all the readable text in this image perfectly. Do not add any extra commentary or formatting, just return the raw text.", 
+                    image_part
+                ]
+            )
+            text = transcription_response.text
                 
         if not text.strip():
-            return jsonify({"detail": "Could not extract text."}), 400
+            return jsonify({"detail": "Could not extract text from the provided file."}), 400
             
-        client = get_gemini_client()
-        
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
             "Do NOT limit yourself to a specific number. Extract as many or as few core topics as naturally exist in the text. "
@@ -75,7 +93,7 @@ def analyze_pdf():
         })
         
     except Exception as e:
-        return jsonify({"detail": f"PDF Analysis failed: {str(e)}"}), 500
+        return jsonify({"detail": f"File Analysis failed: {str(e)}"}), 500
 
 
 @app.route("/api/topic", methods=["POST"])
@@ -85,10 +103,9 @@ def get_topic_details():
         client = get_gemini_client()
         
         topic_name = data.get('topic')
-        banned_terms = data.get('banned_terms', [])
+        covered_topics = data.get('covered_topics', '')
         
-        banned_str = ", ".join(banned_terms)
-        ignore_prompt = f"GLOBAL BAN LIST: The following terms/concepts have ALREADY been defined in previous sections: [{banned_str}]. DO NOT DEFINE THEM AGAIN. Skip them entirely if they appear.\n" if banned_terms else ""
+        ignore_prompt = f"GLOBAL BAN LIST: The following terms/concepts have ALREADY been defined in previous sections: [{covered_topics}]. DO NOT DEFINE THEM AGAIN. Skip them entirely if they appear.\n" if covered_topics else ""
         
         prompt = (
             f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
@@ -349,12 +366,17 @@ KAPARSH_FRONTEND = """
                 </div>
 
                 <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer">
-                    <div class="w-14 h-14 bg-dark rounded-full flex items-center justify-center mb-3">
-                        <i class="fa-solid fa-plus text-xl text-blurple"></i>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
+                        </div>
+                        <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-image text-xl text-famneon"></i>
+                        </div>
                     </div>
-                    <p id="file-name" class="text-sm font-bold text-white">Tap to upload PDF</p>
-                    <p class="text-xs text-neutral-500 mt-1">Max 25 pages</p>
-                    <input type="file" id="file-upload" accept="application/pdf" class="hidden">
+                    <p id="file-name" class="text-sm font-bold text-white">Tap to upload PDF or Image</p>
+                    <p class="text-xs text-neutral-500 mt-1">Max 25 pages (PDF) or 1 Image</p>
+                    <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="hidden">
                 </div>
 
                 <button id="analyze-btn" class="w-full bg-famneon text-black font-bold text-base py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(0,255,163,0.3)]">
@@ -473,7 +495,7 @@ KAPARSH_FRONTEND = """
             schedule: null,
             quiz: null,
             file: null,
-            globalBannedTerms: [] // The Global Memory State for Deduplication
+            globalBannedTerms: [] 
         };
 
         const tomorrow = new Date();
@@ -533,10 +555,10 @@ KAPARSH_FRONTEND = """
         };
 
         document.getElementById('analyze-btn').addEventListener('click', async () => {
-            if (!AppState.file) return alert("Please upload a PDF file first.");
+            if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
-            toggleLoader(true, 'Extracting framework...');
-            AppState.globalBannedTerms = []; // Reset ban list on new upload
+            toggleLoader(true, 'Analyzing file payload...');
+            AppState.globalBannedTerms = []; 
 
             const formData = new FormData();
             formData.append('file', AppState.file);
@@ -579,13 +601,12 @@ KAPARSH_FRONTEND = """
                     body: JSON.stringify({ 
                         text: AppState.extractedText, 
                         topic: topic.title,
-                        banned_terms: AppState.globalBannedTerms
+                        covered_topics: AppState.globalBannedTerms.join(", ")
                     })
                 });
                 if (response.ok) {
                     const details = await response.json();
                     
-                    // Add newly extracted definitions to the Global Ban List
                     if (details.definitions && details.definitions.length > 0) {
                         details.definitions.forEach(d => {
                             AppState.globalBannedTerms.push(d.term);
