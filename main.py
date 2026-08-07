@@ -137,28 +137,64 @@ def get_topic_details():
 @app.route("/api/schedule", methods=["POST"])
 def generate_schedule():
     try:
-        data = request.get_json()
         client = get_gemini_client()
-        topics_json = json.dumps(data.get('topics', []))
+        text = ""
+        exam_date = ""
+        study_hours = 2
         
+        # Route 1: Image Upload (Direct OCR via Gemini)
+        if 'file' in request.files:
+            file = request.files['file']
+            exam_date = request.form.get('exam_date')
+            study_hours = request.form.get('study_hours', 2)
+            
+            filename = file.filename.lower()
+            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+                
+            image_bytes = file.read()
+            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            
+            transcription_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=[
+                    "Transcribe all readable text in this syllabus image perfectly. Return only raw text.", 
+                    image_part
+                ]
+            )
+            text = transcription_response.text
+            
+        # Route 2: Pre-Extracted Text from Frontend
+        elif request.is_json and 'syllabus_text' in request.json:
+            data = request.json
+            text = data.get('syllabus_text', '')
+            exam_date = data.get('exam_date')
+            study_hours = data.get('study_hours', 2)
+            
+        if not text or not text.strip():
+            return jsonify({"detail": "Could not extract syllabus text. Please try a clearer document."}), 400
+            
         prompt = (
-            f"You are a highly efficient study planner utilizing Spaced Repetition.\n"
-            f"Exam Date: {data.get('exam_date')}\n"
-            f"Daily Hours Available: {data.get('study_hours')}\n"
-            f"Topics to map out: {topics_json}\n\n"
+            f"You are a Master Study Planner. The student has provided their complete course/exam syllabus below.\n"
+            f"Target Exam Date: {exam_date}\n"
+            f"Daily Study Hours Available: {study_hours}\n\n"
+            f"Syllabus Content:\n{text[:30000]}\n\n"
             "CRITICAL INSTRUCTIONS:\n"
-            "1. DO NOT assign a flat default 2 hours per topic. Estimate realistic minutes for each topic (e.g., 15 mins for easy topics, 45 mins for complex ones).\n"
-            "2. Group multiple topics into a single day so the student can finish the syllabus early.\n"
-            "3. Optimize the schedule efficiently within the available daily hours.\n"
+            "1. Identify all core subjects and sub-topics from the syllabus.\n"
+            "2. Map them out into a highly realistic daily study schedule starting from Day 1 up to the Exam Date.\n"
+            "3. Allocate estimated minutes per topic. Do not exceed the daily available hours.\n"
+            "4. Mix different subjects on the same day if possible to optimize learning and prevent burnout.\n"
+            "5. Integrate Spaced Repetition (allocate specific days strictly for review of earlier topics).\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "schedule": [\n'
             '    {\n'
             '      "day": 1, \n'
             '      "date": "YYYY-MM-DD", \n'
-            '      "focus_area": "Initial Learning vs Active Recall",\n'
-            '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}, {"name": "Topic 2", "estimated_minutes": 15}], \n'
-            '      "total_hours_today": 0.75, \n'
+            '      "focus_area": "Subject Name - Broad Concept",\n'
+            '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
+            '      "total_hours_today": 2.5, \n'
             '      "actionable_advice": "Specific study technique to use today"\n'
             '    }\n'
             "  ]\n"
@@ -239,7 +275,6 @@ def answer_doubt():
 
 # ==============================================================================
 # MOBILE NATIVE UI INJECTION
-# Used a Python Raw String (r"") to prevent escaping bugs in the JS logic
 # ==============================================================================
 
 KAPARSH_FRONTEND = r"""
@@ -285,20 +320,10 @@ KAPARSH_FRONTEND = r"""
             user-select: none; /* Standard */
         }
         
-        /* Eliminate the default blue highlight globally */
-        ::selection {
-            background: transparent;
-        }
-        ::-moz-selection {
-            background: transparent;
-        }
+        ::selection { background: transparent; }
+        ::-moz-selection { background: transparent; }
         
-        /* Allow text selection ONLY inside input fields */
-        input {
-            -webkit-user-select: auto;
-            user-select: auto;
-        }
-
+        input { -webkit-user-select: auto; user-select: auto; }
         ::-webkit-scrollbar { display: none; }
         
         .loader {
@@ -310,17 +335,9 @@ KAPARSH_FRONTEND = r"""
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .nav-active {
-            color: #fff !important;
-        }
-        .nav-active i {
-            color: #5865F2;
-        }
-        
-        .pdf-page {
-            background-color: #000;
-            color: #fff;
-        }
+        .nav-active { color: #fff !important; }
+        .nav-active i { color: #5865F2; }
+        .pdf-page { background-color: #000; color: #fff; }
     </style>
 </head>
 <body class="antialiased overflow-x-hidden pb-36 font-sans">
@@ -342,13 +359,13 @@ KAPARSH_FRONTEND = r"""
                 <p id="loader-text" class="text-sm font-semibold text-neutral-400">Processing...</p>
             </div>
 
-            <!-- Tab: Home -->
+            <!-- Tab: Home (Micro Analyzer) -->
             <div id="tab-home" class="tab-pane block px-4 py-6">
                 
                 <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
-                    <h2 class="text-2xl font-bold mb-1">New Material</h2>
-                    <p class="text-xs text-neutral-400 mb-6">Configure your study parameters and upload your document to begin.</p>
+                    <h2 class="text-2xl font-bold mb-1">Chapter Analysis</h2>
+                    <p class="text-xs text-neutral-400 mb-6">Set your parameters and upload a textbook chapter for deep-extraction notes and quizzes.</p>
                     
                     <div class="space-y-4 relative z-10">
                         <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
@@ -372,7 +389,7 @@ KAPARSH_FRONTEND = r"""
                             <i class="fa-solid fa-image text-xl text-famneon"></i>
                         </div>
                     </div>
-                    <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Tap to upload PDF or Image</p>
+                    <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Chapter (PDF/Img)</p>
                     <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Unlimited pages! Extracts instantly on-device.</p>
                     <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                 </label>
@@ -389,7 +406,6 @@ KAPARSH_FRONTEND = r"""
                     <span id="topic-count" class="text-[10px] font-bold bg-card border border-borderline px-3 py-1 rounded-full text-neutral-400 uppercase tracking-wide"></span>
                 </div>
                 
-                <!-- Single Unified Notebook Page Container -->
                 <div id="topics-grid" class="bg-card rounded-3xl border border-borderline p-6 flex flex-col gap-6 shadow-lg">
                     <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
                         <i class="fa-solid fa-book-open text-4xl mb-4 text-neutral-600"></i>
@@ -398,18 +414,29 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule -->
+            <!-- Tab: Schedule (Master Syllabus Planner) -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
-                <div id="schedule-setup" class="flex flex-col items-center justify-center py-20 text-center">
+                <div id="schedule-setup" class="flex flex-col items-center justify-center py-10 text-center">
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
-                        <i class="fa-regular fa-calendar text-3xl text-blurple"></i>
+                        <i class="fa-solid fa-map-location-dot text-3xl text-blurple"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-2">Smart Timeline</h3>
-                    <p class="text-sm text-neutral-500 mb-8 px-4">Generate an optimized study timeline to finish your syllabus early.</p>
-                    <button onclick="generateSchedule()" class="bg-white text-black font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
-                        Create Timeline
+                    <h3 class="text-lg font-bold mb-2">Master Syllabus Planner</h3>
+                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your entire course syllabus. We'll map out all subjects into a daily spaced-repetition timeline.</p>
+                    
+                    <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-6 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
+                        <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
+                            <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
+                            <i class="fa-solid fa-image text-xl text-famneon"></i>
+                        </div>
+                        <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus (PDF/Img)</p>
+                        <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                    </label>
+
+                    <button onclick="generateSchedule()" class="w-full max-w-sm bg-blurple text-white font-bold py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(88,101,242,0.3)]">
+                        Build Master Plan
                     </button>
                 </div>
+                
                 <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
                     <!-- Injected by JS -->
                 </div>
@@ -422,7 +449,7 @@ KAPARSH_FRONTEND = r"""
                         <i class="fa-solid fa-gamepad text-3xl text-famneon"></i>
                     </div>
                     <h3 class="text-lg font-bold mb-2">Dynamic Quiz Engine</h3>
-                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery. Questions scale automatically based on document density.</p>
+                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery based on the chapter you analyzed.</p>
                     <button onclick="generateQuiz()" class="bg-blurple text-white font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
                         Start Quiz
                     </button>
@@ -497,6 +524,7 @@ KAPARSH_FRONTEND = r"""
             schedule: null,
             quiz: null,
             file: null,
+            syllabusFile: null,
             globalBannedTerms: [] 
         };
 
@@ -512,7 +540,17 @@ KAPARSH_FRONTEND = r"""
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
                 fileNameDisplay.classList.add('text-famneon');
-                fileNameDisplay.classList.remove('text-neutral-500');
+            }
+        });
+        
+        const syllabusInput = document.getElementById('syllabus-upload');
+        const syllabusNameDisplay = document.getElementById('syllabus-file-name');
+        
+        syllabusInput.addEventListener('change', () => {
+            if (syllabusInput.files.length > 0) {
+                AppState.syllabusFile = syllabusInput.files[0];
+                syllabusNameDisplay.textContent = AppState.syllabusFile.name;
+                syllabusNameDisplay.classList.add('text-blurple');
             }
         });
 
@@ -531,7 +569,9 @@ KAPARSH_FRONTEND = r"""
         navBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const target = btn.dataset.target;
-                if (target !== 'tab-home' && !AppState.topics) return; 
+                if (target === 'tab-summary' || target === 'tab-quiz' || target === 'tab-doubts') {
+                    if (!AppState.topics) return alert("Upload and analyze a Chapter first!");
+                }
                 switchTab(target);
             });
         });
@@ -554,6 +594,7 @@ KAPARSH_FRONTEND = r"""
             switchTab('tab-home');
         };
 
+        // Micro-Analyzer Logic (Chapters)
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
@@ -562,7 +603,6 @@ KAPARSH_FRONTEND = r"""
             let fullText = "";
 
             try {
-                // Determine Edge Extraction (PDF) vs Backend OCR (Image)
                 if (AppState.file.type === "application/pdf" || AppState.file.name.toLowerCase().endsWith(".pdf")) {
                     toggleLoader(true, 'Extracting textbook instantly on device...');
                     
@@ -614,9 +654,7 @@ KAPARSH_FRONTEND = r"""
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
-                AppState.schedule = null; AppState.quiz = null;
-                document.getElementById('schedule-result').classList.add('hidden');
-                document.getElementById('schedule-setup').classList.remove('hidden');
+                AppState.quiz = null;
                 document.getElementById('quiz-result').classList.add('hidden');
                 document.getElementById('quiz-setup').classList.remove('hidden');
 
@@ -625,7 +663,6 @@ KAPARSH_FRONTEND = r"""
 
         async function fetchTopicDetails(index) {
             const topic = AppState.topics[index];
-            
             try {
                 const response = await fetch('/api/topic', {
                     method: 'POST',
@@ -716,11 +753,9 @@ KAPARSH_FRONTEND = r"""
                         <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
                         <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority}</span>
                     </div>
-                    
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
-                    
                     <ul class="mt-4 space-y-1">
                         ${notesList}
                     </ul>
@@ -740,24 +775,48 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
+        // Macro-Planner Logic (Syllabus)
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
+            
             if (!examDate) {
                 switchTab('tab-home');
-                return alert("Please set an exam date on the Home tab.");
+                return alert("Please set your Exam Date on the Home tab first.");
+            }
+            if (!AppState.syllabusFile) {
+                return alert("Please upload your Master Syllabus file first.");
             }
 
-            const loadedTopics = AppState.topics.filter(t => t.loaded);
-            toggleLoader(true, 'Building smart timeline...');
+            toggleLoader(true, 'Analyzing syllabus & building master plan...');
 
             try {
-                const response = await fetch('/api/schedule', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topics: loadedTopics, exam_date: examDate, study_hours: parseFloat(studyHours) })
-                });
-                
+                let response;
+                if (AppState.syllabusFile.type === "application/pdf" || AppState.syllabusFile.name.toLowerCase().endsWith(".pdf")) {
+                    const arrayBuffer = await AppState.syllabusFile.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    let fullText = "";
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        fullText += content.items.map(item => item.str).join(" ") + "\n";
+                    }
+                    
+                    if (!fullText.trim()) throw new Error("Could not extract text. Document might be scanned.");
+
+                    response = await fetch('/api/schedule', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ syllabus_text: fullText, exam_date: examDate, study_hours: parseFloat(studyHours) })
+                    });
+                } else {
+                    const formData = new FormData();
+                    formData.append('file', AppState.syllabusFile);
+                    formData.append('exam_date', examDate);
+                    formData.append('study_hours', studyHours);
+                    response = await fetch('/api/schedule', { method: 'POST', body: formData });
+                }
+
                 const rawText = await response.text();
                 if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
                 
@@ -894,7 +953,7 @@ KAPARSH_FRONTEND = r"""
             const input = document.getElementById('doubt-input');
             const question = input.value.trim();
             if (!question) return;
-            if (!AppState.extractedText) return alert("Please upload and process a document first.");
+            if (!AppState.extractedText) return alert("Please upload and process a Chapter first to use doubts.");
 
             const chatHistory = document.getElementById('chat-history');
             
