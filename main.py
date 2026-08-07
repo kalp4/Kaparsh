@@ -396,7 +396,8 @@ KAPARSH_FRONTEND = r"""
             margin: 0 auto;
             min-height: 100vh;
             position: relative;
-            padding: env(safe-area-inset-top) 16px calc(110px + env(safe-area-inset-bottom)) 16px;
+            /* Increased bottom padding to accommodate larger bottom bar */
+            padding: env(safe-area-inset-top) 16px calc(130px + env(safe-area-inset-bottom)) 16px;
             display: flex; flex-direction: column;
         }
         
@@ -610,8 +611,9 @@ KAPARSH_FRONTEND = r"""
         .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
         @keyframes typeDot { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
+        /* Chat Input moved slightly higher to clear bigger nav bar */
         .chat-input-wrapper {
-            position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); 
+            position: fixed; bottom: calc(112px + env(safe-area-inset-bottom)); 
             left: 50%; transform: translateX(-50%);
             width: 100%; max-width: 430px; padding: 0 16px; z-index: 40;
         }
@@ -633,24 +635,27 @@ KAPARSH_FRONTEND = r"""
         }
         .chat-send-btn:active { transform: scale(0.9); }
 
-        /* Dynamic Island Navigation for iPhone Home Bar */
+        /* LARGER Dynamic Island Navigation for 6.7" Display */
         .dynamic-island {
-            position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); 
+            position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); 
             left: 50%; transform: translateX(-50%);
             background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
             border: 0.5px solid rgba(255,255,255,0.12); border-radius: 100px;
-            display: flex; padding: 6px; gap: 4px; box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+            display: flex; padding: 10px; gap: 8px; /* Increased padding and gap */
+            box-shadow: 0 16px 32px rgba(0,0,0,0.5);
             z-index: 100;
         }
         .nav-indicator {
-            position: absolute; top: 6px; left: 6px; width: 44px; height: 44px;
+            position: absolute; top: 10px; left: 10px; width: 56px; height: 56px; /* Bigger indicator matching button */
             background: rgba(255,255,255,0.12); border-radius: 50%;
             transition: transform 0.4s var(--bezier); z-index: 0; pointer-events: none;
         }
         .nav-btn {
-            width: 44px; height: 44px; border-radius: 50%; border: none; background: transparent;
+            width: 56px; height: 56px; /* Bigger button area */
+            border-radius: 50%; border: none; background: transparent;
             color: var(--text-tertiary); display: flex; align-items: center; justify-content: center;
-            font-size: 18px; cursor: pointer; position: relative; z-index: 1;
+            font-size: 22px; /* Bigger Icons */ 
+            cursor: pointer; position: relative; z-index: 1;
             transition: color 0.3s var(--bezier), transform 0.2s var(--bezier);
         }
         .nav-btn:active { transform: scale(0.85); }
@@ -843,7 +848,9 @@ KAPARSH_FRONTEND = r"""
             
             navBtns.forEach(btn => btn.classList.remove('nav-active'));
             navBtns[index].classList.add('nav-active');
-            indicator.style.transform = `translateX(${index * 48}px)`;
+            
+            // Transform logic for larger nav bar (56px width + 8px gap = 64px spacing step)
+            indicator.style.transform = `translateX(${index * 64}px)`;
 
             tabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('flex'); });
             const target = document.getElementById(targetId);
