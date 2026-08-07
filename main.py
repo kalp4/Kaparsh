@@ -42,7 +42,6 @@ def analyze_pdf():
         mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
         file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
         
-        # Native Multimodal Extraction via Gemini
         extraction_response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=[
@@ -102,16 +101,15 @@ def parse_syllabus():
         mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
         file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
         
-        # Native Multimodal Syllabus Reading
         prompt = (
-            "Analyze this syllabus/datesheet document. Extract two things:\n"
-            "1. 'subjects': A clean array of all distinct subjects found in it.\n"
+            "Analyze this syllabus/datesheet document carefully. Extract two things:\n"
+            "1. 'subjects': A clean array of strings representing all distinct subjects or exam modules found in it (e.g., ['Mathematics', 'Physics', 'Chemistry']). If explicit subjects aren't labeled, extract the main course or module titles.\n"
             "2. 'full_text': The complete readable text extracted from the document.\n"
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
             '  "subjects": ["Subject 1", "Subject 2"],\n'
             '  "full_text": "Complete text..."\n'
-            "}\n\n"
+            "}"
         )
         
         response = client.models.generate_content(
@@ -120,7 +118,15 @@ def parse_syllabus():
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
         )
         
-        return jsonify(json.loads(response.text))
+        parsed = json.loads(response.text)
+        subjects = parsed.get("subjects", [])
+        if not subjects:
+            subjects = ["General Coursework / Core Syllabus"]
+
+        return jsonify({
+            "subjects": subjects,
+            "full_text": parsed.get("full_text", "")
+        })
         
     except Exception as e:
         return jsonify({"detail": f"Syllabus parsing failed: {str(e)}"}), 500
@@ -201,12 +207,12 @@ def generate_schedule():
                 "}"
             )
         else:
-            subjects_str = ", ".join(selected_subjects) if selected_subjects else "All Subjects"
+            subjects_str = ", ".join(selected_subjects) if selected_subjects else "All Selected Subjects"
             prompt = (
                 f"You are a Master Study Planner. Build a custom study schedule based on the syllabus text below.\n"
                 f"Target Exam Date: {exam_date}\n"
                 f"Daily Study Hours Available: {study_hours}\n"
-                f"ONLY include these selected subjects: [{subjects_str}]. Ignore any other subjects found in the syllabus text.\n\n"
+                f"Strictly limit the schedule ONLY to these selected subjects: [{subjects_str}]. Completely ignore any other subjects or modules mentioned in the syllabus text.\n\n"
                 f"Syllabus Content:\n{syllabus_text[:30000]}\n\n"
                 "Return ONLY a JSON object with this exact structure:\n"
                 "{\n"
@@ -357,23 +363,12 @@ KAPARSH_FRONTEND = r"""
                 <p id="loader-text" class="text-xs font-semibold text-neutral-400">Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)</p>
             </div>
 
-            <!-- Tab: Home (Micro Analyzer) -->
+            <!-- Tab: Home (Micro Analyzer - Cleaned up without exam date/hours) -->
             <div id="tab-home" class="tab-pane block px-4 py-6">
                 <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
                     <h2 class="text-2xl font-bold mb-1">Chapter Analysis</h2>
-                    <p class="text-xs text-neutral-400 mb-6">Upload a textbook chapter for deep-extraction notes and quizzes.</p>
-                    
-                    <div class="space-y-4 relative z-10">
-                        <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
-                            <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
-                            <input type="date" id="exam-date" class="bg-transparent text-right text-sm font-bold text-famneon outline-none" style="color-scheme: dark;">
-                        </div>
-                        <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
-                            <label class="text-sm font-semibold text-neutral-300">Daily Hours</label>
-                            <input type="number" id="study-hours" value="2" min="1" max="16" class="bg-transparent text-right text-sm font-bold text-white outline-none w-16">
-                        </div>
-                    </div>
+                    <p class="text-xs text-neutral-400">Upload a single textbook chapter or section for deep-extraction notes, formulas, and quizzes.</p>
                 </div>
 
                 <label id="drop-zone" for="file-upload" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative block overflow-hidden">
@@ -404,27 +399,39 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule (Master Syllabus Planner with Subject Picker) -->
+            <!-- Tab: Schedule (Master Syllabus Planner with Exam Date, Daily Hours, & Subject Picker) -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
-                <div id="schedule-setup" class="flex flex-col items-center justify-center py-10 text-center">
-                    <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
-                        <i class="fa-solid fa-map-location-dot text-3xl text-blurple"></i>
+                <div id="schedule-setup" class="flex flex-col items-center justify-center py-4 text-center">
+                    <div class="w-16 h-16 bg-card rounded-full flex items-center justify-center mb-3 border border-borderline">
+                        <i class="fa-solid fa-map-location-dot text-2xl text-blurple"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-2">Master Syllabus Planner</h3>
-                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your course syllabus. We'll parse the subjects so you can select what to study.</p>
+                    <h3 class="text-lg font-bold mb-1">Master Syllabus Planner</h3>
+                    <p class="text-xs text-neutral-500 mb-5 px-4">Set your timeline parameters, upload your syllabus, and pick your active subjects.</p>
                     
-                    <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-6 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
-                        <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
-                            <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
-                            <i class="fa-solid fa-image text-xl text-famneon"></i>
+                    <!-- Exam Date & Daily Hours Parameters (Moved here) -->
+                    <div class="w-full max-w-sm space-y-3 mb-5">
+                        <div class="bg-card rounded-2xl p-4 border border-borderline flex justify-between items-center">
+                            <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
+                            <input type="date" id="schedule-exam-date" class="bg-transparent text-right text-sm font-bold text-famneon outline-none" style="color-scheme: dark;">
                         </div>
-                        <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus (PDF/Img)</p>
+                        <div class="bg-card rounded-2xl p-4 border border-borderline flex justify-between items-center">
+                            <label class="text-sm font-semibold text-neutral-300">Daily Hours</label>
+                            <input type="number" id="schedule-study-hours" value="2" min="1" max="16" class="bg-transparent text-right text-sm font-bold text-white outline-none w-16">
+                        </div>
+                    </div>
+
+                    <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-5 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-4 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
+                        <div class="flex items-center gap-3 mb-2 relative z-10 pointer-events-none">
+                            <i class="fa-solid fa-file-pdf text-lg text-blurple"></i>
+                            <i class="fa-solid fa-image text-lg text-famneon"></i>
+                        </div>
+                        <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus / Datesheet</p>
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
                     <!-- Subject Selection Checklist Area -->
                     <div id="subject-selector-area" class="w-full max-w-sm mb-6 hidden">
-                        <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3 text-left">Select Subjects to Include:</p>
+                        <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2 text-left">Select Subjects to Study:</p>
                         <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left">
                             <!-- Populated by JS -->
                         </div>
@@ -516,8 +523,8 @@ KAPARSH_FRONTEND = r"""
         };
 
         const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 7);
-        document.getElementById('exam-date').valueAsDate = tomorrow;
+        tomorrow.setDate(tomorrow.getDate() + 14);
+        document.getElementById('schedule-exam-date').valueAsDate = tomorrow;
 
         const fileInput = document.getElementById('file-upload');
         const fileNameDisplay = document.getElementById('file-name');
@@ -544,7 +551,7 @@ KAPARSH_FRONTEND = r"""
         });
 
         async function parseSyllabusSubjects() {
-            toggleLoader(true, 'Parsing Syllabus...', 'Extracting subjects so you can select what to study...');
+            toggleLoader(true, 'Parsing Syllabus...', 'Multimodal AI is reading your syllabus & detecting subjects...');
             const formData = new FormData();
             formData.append('file', AppState.syllabusFile);
 
@@ -558,7 +565,7 @@ KAPARSH_FRONTEND = r"""
                 toggleLoader(false);
             } catch (err) {
                 toggleLoader(false);
-                alert("Could not auto-detect subjects: " + err.message + ". You can still build your plan normally.");
+                alert("Auto-detection note: " + err.message + ". You can still generate your master plan normally.");
             }
         }
 
@@ -568,7 +575,7 @@ KAPARSH_FRONTEND = r"""
             
             if (!subjects || subjects.length === 0) return;
 
-            container.innerHTML = subjects.map((sub, i) => `
+            container.innerHTML = subjects.map((sub) => `
                 <label class="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" name="syllabus-subject" value="${sub}" checked class="w-4 h-4 accent-blurple rounded bg-dark border-borderline">
                     <span class="text-xs text-neutral-200 font-medium">${sub}</span>
@@ -624,7 +631,7 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via server...');
+            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via multimodal AI...');
 
             try {
                 const formData = new FormData();
@@ -758,12 +765,11 @@ KAPARSH_FRONTEND = r"""
 
         // Macro-Planner Logic with Subject Filtering Support
         async function generateSchedule() {
-            const examDate = document.getElementById('exam-date').value;
-            const studyHours = document.getElementById('study-hours').value;
+            const examDate = document.getElementById('schedule-exam-date').value;
+            const studyHours = document.getElementById('schedule-study-hours').value;
             
             if (!examDate) {
-                switchTab('tab-home');
-                return alert("Please set your Exam Date on the Home tab first.");
+                return alert("Please set your Exam Date in the Plan tab first.");
             }
 
             const selectedSubjects = [];
@@ -813,13 +819,13 @@ KAPARSH_FRONTEND = r"""
                 document.getElementById('schedule-result').classList.remove('hidden');
                 document.getElementById('schedule-result').classList.add('flex');
                 toggleLoader(false);
-            } catch (err) { showError(err.message); }
+            } catch (err) { alert("Error: " + err.message); toggleLoader(false); }
         }
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
             if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
-                return showError("Invalid schedule data received.");
+                return alert("Invalid schedule data received.");
             }
             
             container.innerHTML = AppState.schedule.map((day) => `
