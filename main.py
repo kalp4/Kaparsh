@@ -111,10 +111,10 @@ def get_topic_details():
             f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
             f"{ignore_prompt}"
             "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
-            "CRITICAL ANTI-REPETITION INSTRUCTIONS:\n"
-            "1. Focus ONLY on the unique nuances of this specific topic. Do not summarize the whole chapter.\n"
-            "2. MUTUALLY EXCLUSIVE: If a fact is a 'definition', do not repeat it in 'notes'. Every piece of info must appear exactly ONCE.\n"
-            "3. BE HIGHLY CONCISE: Strip out filler words.\n"
+            "CRITICAL ANTI-REPETITION INSTRUCTIONS (STRICTLY ENFORCED):\n"
+            "1. MUTUALLY EXCLUSIVE: If a fact, definition, or concept is placed in 'definitions', it MUST NOT be repeated in 'notes' or 'formulas'. Every single piece of information must appear exactly ONCE in the entire JSON.\n"
+            "2. NO DUPLICATE MEANINGS: Do not provide two definitions or notes that mean the exact same thing.\n"
+            "3. BE HIGHLY CONCISE: Do not use filler words. Extract only core facts.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
@@ -365,8 +365,9 @@ KAPARSH_FRONTEND = """
                     </div>
                 </div>
 
-                <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer">
-                    <div class="flex items-center gap-3 mb-3">
+                <!-- Fix: Changed to a <label> to bypass iOS Webview security blocks -->
+                <label id="drop-zone" for="file-upload" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative block overflow-hidden">
+                    <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
                         <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
                             <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
                         </div>
@@ -374,10 +375,10 @@ KAPARSH_FRONTEND = """
                             <i class="fa-solid fa-image text-xl text-famneon"></i>
                         </div>
                     </div>
-                    <p id="file-name" class="text-sm font-bold text-white">Tap to upload PDF or Image</p>
-                    <p class="text-xs text-neutral-500 mt-1">Max 25 pages (PDF) or 1 Image</p>
-                    <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="hidden">
-                </div>
+                    <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Tap to upload PDF or Image</p>
+                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Max 25 pages (PDF) or 1 Image</p>
+                    <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                </label>
 
                 <button id="analyze-btn" class="w-full bg-famneon text-black font-bold text-base py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(0,255,163,0.3)]">
                     Generate Intelligence
@@ -502,11 +503,9 @@ KAPARSH_FRONTEND = """
         tomorrow.setDate(tomorrow.getDate() + 7);
         document.getElementById('exam-date').valueAsDate = tomorrow;
 
-        const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-upload');
         const fileNameDisplay = document.getElementById('file-name');
 
-        dropZone.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 AppState.file = fileInput.files[0];
