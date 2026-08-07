@@ -51,6 +51,7 @@ def analyze_pdf():
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
             "Do NOT limit yourself to a specific number. Extract as many or as few core topics as naturally exist in the text. "
+            "CRITICAL INSTRUCTION: Ensure there are NO duplicate or heavily overlapping topics. Merge similar concepts into a single overarching topic title.\n"
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
             '  "topics": [\n'
@@ -83,19 +84,26 @@ def get_topic_details():
         data = request.get_json()
         client = get_gemini_client()
         
+        topic_name = data.get('topic')
+        covered_topics = data.get('covered_topics', '')
+        
+        ignore_prompt = f"WARNING: The following topics have ALREADY been processed. DO NOT include any definitions, formulas, or notes that belong to these topics: [{covered_topics}].\n" if covered_topics else ""
+        
         prompt = (
-            f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{data.get('topic')}'.\n"
+            f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the topic: '{topic_name}'.\n"
+            f"{ignore_prompt}"
             "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
-            "CRITICAL INSTRUCTIONS:\n"
-            "1. BE HIGHLY CONCISE. Do not use filler words.\n"
-            "2. ABSOLUTELY NO REPETITION. Never repeat the same meaning, definition, or point twice across any category.\n"
+            "CRITICAL ANTI-REPETITION INSTRUCTIONS (STRICTLY ENFORCED):\n"
+            "1. MUTUALLY EXCLUSIVE: If a fact, definition, or concept is placed in 'definitions', it MUST NOT be repeated in 'notes' or 'formulas'. Every single piece of information must appear exactly ONCE in the entire JSON.\n"
+            "2. NO DUPLICATE MEANINGS: Do not provide two definitions or notes that mean the exact same thing.\n"
+            "3. BE HIGHLY CONCISE: Do not use filler words. Extract only core facts.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
             '  "definitions": [{"term": "Exact Term", "definition": "Clear, concise definition without repeating"}], (Leave empty [] if none exist)\n'
             '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist)\n'
             '  "derivations": [{"title": "Derivation Name", "content": "Concise mathematical or logical steps"}], (Leave empty [] if none exist)\n'
-            '  "notes": ["Concise point 1", "Concise point 2"] (General bullet points, strictly no repetition)\n'
+            '  "notes": ["Concise point 1", "Concise point 2"] (General bullet points, strictly no repetition of definitions)\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"
         )
@@ -560,11 +568,16 @@ KAPARSH_FRONTEND = """
 
         async function fetchTopicDetails(index) {
             const topic = AppState.topics[index];
+            const covered = AppState.topics.slice(0, index).map(t => t.title).join(", ");
             try {
                 const response = await fetch('/api/topic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: AppState.extractedText, topic: topic.title })
+                    body: JSON.stringify({ 
+                        text: AppState.extractedText, 
+                        topic: topic.title,
+                        covered_topics: covered
+                    })
                 });
                 if (response.ok) {
                     const details = await response.json();
@@ -601,7 +614,7 @@ KAPARSH_FRONTEND = """
                     <div class="mt-4 space-y-2">
                         ${t.definitions.map(d => `
                             <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl break-inside-avoid shadow-[0_0_15px_rgba(88,101,242,0.05)]">
-                                <p class="text-sm text-neutral-200 leading-relaxed tracking-wide">
+                                <p class="text-sm text-white leading-relaxed tracking-wide">
                                     <strong class="text-blurple font-bold mr-2">${d.term}:</strong>${d.definition}
                                 </p>
                             </div>
@@ -614,7 +627,7 @@ KAPARSH_FRONTEND = """
                         ${t.formulas.map(f => `
                             <div class="bg-famneon/5 border border-famneon/20 p-4 rounded-xl flex flex-col items-center break-inside-avoid shadow-[0_0_15px_rgba(0,255,163,0.05)]">
                                 <p class="font-mono text-lg font-bold text-famneon tracking-wider drop-shadow-md">${f.equation}</p>
-                                <p class="text-xs text-neutral-300 font-medium mt-1 tracking-wide">${f.meaning}</p>
+                                <p class="text-xs text-white font-medium mt-1 tracking-wide">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
@@ -625,13 +638,13 @@ KAPARSH_FRONTEND = """
                         ${t.derivations.map(d => `
                             <div class="bg-dark border border-xblue/30 p-4 rounded-xl break-inside-avoid shadow-[0_0_15px_rgba(29,161,242,0.05)]">
                                 <p class="text-sm font-bold text-xblue mb-1 drop-shadow-md">${d.title}</p>
-                                <p class="font-mono text-xs text-neutral-300 leading-relaxed whitespace-pre-wrap">${d.content}</p>
+                                <p class="font-mono text-xs text-white leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-200 leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
+                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-white leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
 
                 return `
                 <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0 break-inside-avoid">
