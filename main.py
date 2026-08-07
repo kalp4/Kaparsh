@@ -92,8 +92,7 @@ def get_topic_details():
             '  "definitions": [{"term": "Exact Term", "definition": "Clear definition"}], (Leave empty [] if none exist)\n'
             '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist)\n'
             '  "derivations": [{"title": "Derivation Name", "content": "The mathematical or logical steps"}], (Leave empty [] if none exist)\n'
-            '  "notes": ["Detailed point 1", "Detailed point 2"], (General bullet points)\n'
-            '  "analogy": "A simple, highly effective real-world analogy explaining this concept to a beginner."\n'
+            '  "notes": ["Detailed point 1", "Detailed point 2"] (General bullet points)\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"
         )
@@ -118,11 +117,14 @@ def generate_schedule():
         topics_json = json.dumps(data.get('topics', []))
         
         prompt = (
-            f"You are an expert study planner utilizing the Spaced Repetition algorithm. Create a schedule.\n"
+            f"You are a highly efficient study planner utilizing Spaced Repetition.\n"
             f"Exam Date: {data.get('exam_date')}\n"
-            f"Daily Hours: {data.get('study_hours')}\n"
+            f"Daily Hours Available: {data.get('study_hours')}\n"
             f"Topics to map out: {topics_json}\n\n"
-            "Distribute them using the 'Learn, Recall, Master' spacing method. "
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. DO NOT assign a flat default 2 hours per topic. Estimate realistic minutes for each topic (e.g., 15 mins for easy topics, 45 mins for complex ones).\n"
+            "2. Group multiple topics into a single day so the student can finish the syllabus early.\n"
+            "3. Optimize the schedule efficiently within the available daily hours.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "schedule": [\n'
@@ -130,8 +132,8 @@ def generate_schedule():
             '      "day": 1, \n'
             '      "date": "YYYY-MM-DD", \n'
             '      "focus_area": "Initial Learning vs Active Recall",\n'
-            '      "topics_to_study": ["Topic Name 1"], \n'
-            '      "hours_allocated": 2.5, \n'
+            '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}, {"name": "Topic 2", "estimated_minutes": 15}], \n'
+            '      "total_hours_today": 0.75, \n'
             '      "actionable_advice": "Specific study technique to use today"\n'
             '    }\n'
             "  ]\n"
@@ -157,10 +159,12 @@ def generate_quiz():
         topics_json = json.dumps(data.get('topics', []))
         
         prompt = (
-            "You are a strict examiner. Create a 5-question multiple-choice practice exam based on these topics.\n"
+            "You are a strict examiner. Create a multiple-choice practice exam based on these topics.\n"
             f"Topics: {topics_json}\n\n"
-            "The questions must be highly challenging. Do not just test definitions; test application. "
-            "For the explanation, you MUST explain exactly why the correct answer is right AND why a student might be tricked by the distractors (incorrect options).\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. Dynamically scale the number of questions based on the number of topics (generate 1 or 2 highly challenging questions per topic).\n"
+            "2. Do not just test definitions; test application.\n"
+            "3. For the explanation, you MUST explain exactly why the correct answer is right AND why a student might be tricked by the distractors.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "quiz": [\n'
@@ -183,6 +187,29 @@ def generate_quiz():
         
     except Exception as e:
         return jsonify({"detail": f"Quiz generation failed: {str(e)}"}), 500
+
+
+@app.route("/api/doubt", methods=["POST"])
+def answer_doubt():
+    try:
+        data = request.get_json()
+        client = get_gemini_client()
+        
+        prompt = (
+            "You are a helpful expert tutor. A student has a doubt regarding their study material.\n\n"
+            f"Study Material Context:\n{data.get('text')}\n\n"
+            f"Student's Doubt: {data.get('question')}\n\n"
+            "Provide a clear, concise, and accurate explanation based ONLY on the context provided. If the answer is not in the text, explain the concept generally but gently mention that the specific detail is outside the provided text."
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=prompt
+        )
+        
+        return jsonify({"answer": response.text})
+    except Exception as e:
+        return jsonify({"detail": f"Failed to answer doubt: {str(e)}"}), 500
 
 
 # ==============================================================================
@@ -228,7 +255,6 @@ KAPARSH_FRONTEND = """
             color: #fff;
             -webkit-tap-highlight-color: transparent;
         }
-        /* Hide scrollbar for native app feel */
         ::-webkit-scrollbar { display: none; }
         
         .loader {
@@ -247,19 +273,17 @@ KAPARSH_FRONTEND = """
             color: #5865F2;
         }
         
-        /* PDF specific styling to ensure it renders dark mode cleanly or inverts if needed */
         .pdf-page {
             background-color: #000;
             color: #fff;
         }
     </style>
 </head>
-<body class="antialiased overflow-x-hidden pb-24">
+<body class="antialiased overflow-x-hidden pb-36">
 
-    <!-- Mobile Wrapper for Desktop Viewing -->
     <div class="max-w-md mx-auto min-h-screen bg-dark relative border-x border-borderline shadow-2xl">
         
-        <!-- Header (IG iOS Style) -->
+        <!-- Header -->
         <header class="sticky top-0 z-40 bg-dark/80 backdrop-blur-md border-b border-borderline px-4 py-3 flex justify-between items-center" data-html2canvas-ignore>
             <h1 class="text-xl font-bold tracking-tight">Kaparsh</h1>
             <button id="download-btn" onclick="downloadNotes()" class="hidden w-8 h-8 rounded-full bg-card border border-borderline flex items-center justify-center active:scale-95 transition-transform">
@@ -267,19 +291,16 @@ KAPARSH_FRONTEND = """
             </button>
         </header>
 
-        <!-- Main Content Area -->
         <main class="w-full">
             
-            <!-- Global Loader -->
             <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
                 <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
                 <p id="loader-text" class="text-sm font-semibold text-neutral-400">Processing...</p>
             </div>
 
-            <!-- Tab: Home (Setup & Upload) -->
+            <!-- Tab: Home -->
             <div id="tab-home" class="tab-pane block px-4 py-6">
                 
-                <!-- FamApp style neon hero card -->
                 <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
                     <h2 class="text-2xl font-bold mb-1">New Material</h2>
@@ -298,14 +319,14 @@ KAPARSH_FRONTEND = """
                     </div>
                 </div>
 
-                <!-- IG/X style file uploader -->
+                <!-- Fix: application/pdf eliminates OS lag -->
                 <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors">
                     <div class="w-14 h-14 bg-dark rounded-full flex items-center justify-center mb-3">
                         <i class="fa-solid fa-plus text-xl text-blurple"></i>
                     </div>
                     <p id="file-name" class="text-sm font-bold text-white">Tap to upload PDF</p>
                     <p class="text-xs text-neutral-500 mt-1">Max 25 pages</p>
-                    <input type="file" id="file-upload" accept=".pdf" class="hidden">
+                    <input type="file" id="file-upload" accept="application/pdf" class="hidden">
                 </div>
 
                 <button id="analyze-btn" class="w-full bg-famneon text-black font-bold text-base py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(0,255,163,0.3)]">
@@ -321,7 +342,6 @@ KAPARSH_FRONTEND = """
                 </div>
                 
                 <div id="topics-grid" class="flex flex-col gap-6">
-                    <!-- Empty State -->
                     <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
                         <i class="fa-solid fa-folder-open text-4xl mb-4 text-neutral-600"></i>
                         <p class="text-sm font-medium">No notes generated yet.</p>
@@ -335,8 +355,8 @@ KAPARSH_FRONTEND = """
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
                         <i class="fa-regular fa-calendar text-3xl text-blurple"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-2">Spaced Repetition</h3>
-                    <p class="text-sm text-neutral-500 mb-8 px-4">Generate an algorithmic study timeline optimized for your exam date.</p>
+                    <h3 class="text-lg font-bold mb-2">Smart Timeline</h3>
+                    <p class="text-sm text-neutral-500 mb-8 px-4">Generate an optimized study timeline to finish your syllabus early.</p>
                     <button onclick="generateSchedule()" class="bg-white text-black font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
                         Create Timeline
                     </button>
@@ -352,8 +372,8 @@ KAPARSH_FRONTEND = """
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
                         <i class="fa-solid fa-gamepad text-3xl text-famneon"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-2">Knowledge Check</h3>
-                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery with AI-generated distractor questions.</p>
+                    <h3 class="text-lg font-bold mb-2">Dynamic Quiz Engine</h3>
+                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery. Questions scale automatically based on document density.</p>
                     <button onclick="generateQuiz()" class="bg-blurple text-white font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
                         Start Quiz
                     </button>
@@ -367,25 +387,53 @@ KAPARSH_FRONTEND = """
                 </div>
             </div>
 
+            <!-- Tab: Doubts (New Chat Feature) -->
+            <div id="tab-doubts" class="tab-pane hidden px-4 py-6 h-full flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold">Doubts</h2>
+                </div>
+                
+                <!-- Chat history area -->
+                <div id="chat-history" class="flex-1 overflow-y-auto flex flex-col gap-4 pb-10">
+                    <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start shadow-sm">
+                        <p class="text-sm text-neutral-200">Hi! I've read your document. Ask me anything about the topics inside, and I'll clear your doubts.</p>
+                    </div>
+                </div>
+                
+                <!-- Input area -->
+                <div class="fixed bottom-[88px] left-0 right-0 mx-auto w-full max-w-md px-4 z-40">
+                    <div class="bg-card border border-borderline rounded-full flex items-center p-1 shadow-lg shadow-black">
+                        <input type="text" id="doubt-input" placeholder="Ask a question..." class="flex-1 bg-transparent text-white text-sm px-4 outline-none placeholder-neutral-500">
+                        <button onclick="sendDoubt()" class="w-10 h-10 bg-blurple rounded-full flex items-center justify-center text-white active:scale-95 transition-transform shrink-0">
+                            <i class="fa-solid fa-arrow-up"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </main>
 
-        <!-- Bottom Navigation Bar (iOS / X Style) -->
-        <nav class="fixed bottom-0 w-full max-w-md bg-dark/90 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50" data-html2canvas-ignore>
-            <button class="nav-btn active text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-home">
+        <!-- Bottom Navigation Bar -->
+        <nav class="fixed bottom-0 w-full max-w-md bg-dark/95 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50" data-html2canvas-ignore>
+            <button class="nav-btn active text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-home">
                 <i class="fa-solid fa-house text-[22px]"></i>
                 <span class="text-[10px] font-medium">Home</span>
             </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-summary">
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-summary">
                 <i class="fa-solid fa-layer-group text-[22px]"></i>
                 <span class="text-[10px] font-medium">Notes</span>
             </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-schedule">
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-schedule">
                 <i class="fa-solid fa-calendar-day text-[22px]"></i>
                 <span class="text-[10px] font-medium">Plan</span>
             </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-quiz">
-                <i class="fa-solid fa-flask text-[22px]"></i>
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-quiz">
+                <i class="fa-solid fa-gamepad text-[22px]"></i>
                 <span class="text-[10px] font-medium">Quiz</span>
+            </button>
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-doubts">
+                <i class="fa-solid fa-comment-dots text-[22px]"></i>
+                <span class="text-[10px] font-medium">Doubts</span>
             </button>
         </nav>
 
@@ -400,12 +448,10 @@ KAPARSH_FRONTEND = """
             file: null
         };
 
-        // Setup Dates
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 7);
         document.getElementById('exam-date').valueAsDate = tomorrow;
 
-        // File Upload Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-upload');
         const fileNameDisplay = document.getElementById('file-name');
@@ -420,7 +466,6 @@ KAPARSH_FRONTEND = """
             }
         });
 
-        // Bottom Navigation Logic
         const navBtns = document.querySelectorAll('.nav-btn');
         const tabPanes = document.querySelectorAll('.tab-pane');
 
@@ -441,7 +486,6 @@ KAPARSH_FRONTEND = """
             });
         });
 
-        // UI Helpers
         const toggleLoader = (show, text = 'Processing...') => {
             document.getElementById('loader-text').innerText = text;
             if (show) {
@@ -460,7 +504,6 @@ KAPARSH_FRONTEND = """
             switchTab('tab-home');
         };
 
-        // Core App Logic
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF file first.");
 
@@ -483,7 +526,6 @@ KAPARSH_FRONTEND = """
                 switchTab('tab-summary');
                 toggleLoader(false);
                 
-                // Micro-tasking sequential loads
                 for (let i = 0; i < AppState.topics.length; i++) {
                     await fetchTopicDetails(i);
                     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -537,11 +579,10 @@ KAPARSH_FRONTEND = """
                     </div>`;
                 }
 
-                // Vibrant Definitions (Discord Blurple)
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.definitions.map(d => `
-                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl">
+                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl break-inside-avoid">
                                 <p class="text-sm text-neutral-300">
                                     <strong class="text-blurple font-bold mr-1">${d.term}:</strong>${d.definition}
                                 </p>
@@ -550,11 +591,10 @@ KAPARSH_FRONTEND = """
                     </div>
                 ` : '';
 
-                // Boxed Formulas (FamApp Neon)
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.formulas.map(f => `
-                            <div class="bg-famneon/10 border border-famneon/30 p-4 rounded-2xl flex flex-col items-center">
+                            <div class="bg-famneon/10 border border-famneon/30 p-4 rounded-2xl flex flex-col items-center break-inside-avoid">
                                 <p class="font-mono text-lg font-bold text-famneon tracking-wider">${f.equation}</p>
                                 <p class="text-[10px] text-famneon/70 uppercase tracking-widest font-bold mt-1">${f.meaning}</p>
                             </div>
@@ -562,11 +602,10 @@ KAPARSH_FRONTEND = """
                     </div>
                 ` : '';
 
-                // Derivations (X Blue)
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.derivations.map(d => `
-                            <div class="bg-card border border-xblue/30 p-4 rounded-2xl">
+                            <div class="bg-card border border-xblue/30 p-4 rounded-2xl break-inside-avoid">
                                 <p class="text-xs font-bold text-xblue uppercase tracking-wider mb-2">${d.title}</p>
                                 <p class="text-xs text-neutral-300 font-mono leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
@@ -574,11 +613,10 @@ KAPARSH_FRONTEND = """
                     </div>
                 ` : '';
 
-                // Bullet Notes
                 const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-300"><span class="text-neutral-600 mr-2">•</span>${n}</li>`).join('');
 
                 return `
-                <div class="bg-card p-5 rounded-3xl border border-borderline">
+                <div class="bg-card p-5 rounded-3xl border border-borderline break-inside-avoid">
                     <div class="flex justify-between items-start mb-3">
                         <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
                         <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest">${t.priority}</span>
@@ -591,16 +629,6 @@ KAPARSH_FRONTEND = """
                     <ul class="mt-4">
                         ${notesList}
                     </ul>
-                    
-                    <div class="mt-5 pt-4 border-t border-borderline">
-                        <div class="flex items-start gap-2">
-                            <i class="fa-solid fa-bolt text-famneon mt-0.5 text-xs"></i>
-                            <div>
-                                <p class="text-[10px] uppercase font-bold text-neutral-500 mb-1 tracking-wider">Analogy</p>
-                                <p class="text-sm text-neutral-300 leading-relaxed">${t.analogy}</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             `}).join('');
         }
@@ -626,7 +654,7 @@ KAPARSH_FRONTEND = """
             }
 
             const loadedTopics = AppState.topics.filter(t => t.loaded);
-            toggleLoader(true, 'Building timeline...');
+            toggleLoader(true, 'Building smart timeline...');
 
             try {
                 const response = await fetch('/api/schedule', {
@@ -658,13 +686,18 @@ KAPARSH_FRONTEND = """
                     <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline">
                         <div class="flex justify-between items-start mb-1">
                             <span class="text-famneon text-xs font-bold">${day.date.split('-').slice(1).join('/')}</span>
-                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.hours_allocated}h</span>
+                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today}h</span>
                         </div>
                         <h4 class="font-bold text-white text-sm mb-3">${day.focus_area}</h4>
-                        <div class="flex flex-wrap gap-1 mb-3">
-                            ${day.topics_to_study.map(t => `<span class="text-[10px] px-2 py-1 bg-dark border border-borderline text-neutral-300 rounded font-medium">${t}</span>`).join('')}
+                        <div class="flex flex-col gap-2 mb-4">
+                            ${day.topics.map(t => `
+                                <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
+                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name}</span>
+                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes} min</span>
+                                </div>
+                            `).join('')}
                         </div>
-                        <p class="text-xs text-neutral-400 leading-relaxed">${day.actionable_advice}</p>
+                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice}</p>
                     </div>
                 </div>
             `).join('');
@@ -755,6 +788,64 @@ KAPARSH_FRONTEND = """
                         <h3 class="text-5xl font-black text-white mb-2">${score} <span class="text-neutral-600 text-3xl">/ ${AppState.quiz.length}</span></h3>
                     </div>
                 `;
+            }
+        }
+
+        // Doubts Chat Feature
+        document.getElementById('doubt-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendDoubt();
+        });
+
+        async function sendDoubt() {
+            const input = document.getElementById('doubt-input');
+            const question = input.value.trim();
+            if (!question) return;
+            if (!AppState.extractedText) return alert("Please upload and process a document first.");
+
+            const chatHistory = document.getElementById('chat-history');
+            
+            // Add user bubble
+            chatHistory.innerHTML += `
+                <div class="bg-blurple text-white p-4 rounded-2xl rounded-tr-sm max-w-[85%] self-end shadow-md">
+                    <p class="text-sm">${question}</p>
+                </div>
+            `;
+            input.value = '';
+            window.scrollTo(0, document.body.scrollHeight);
+
+            // Add loading bubble
+            const loaderId = 'loader-' + Date.now();
+            chatHistory.innerHTML += `
+                <div id="${loaderId}" class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start flex items-center gap-1.5 shadow-sm">
+                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce"></div>
+                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                </div>
+            `;
+            window.scrollTo(0, document.body.scrollHeight);
+
+            try {
+                const response = await fetch('/api/doubt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: AppState.extractedText, question: question })
+                });
+                
+                const data = await response.json();
+                document.getElementById(loaderId).remove();
+                
+                if (!response.ok) throw new Error(data.detail || "Server Error");
+                
+                const formattedAnswer = data.answer.replace(/\\n/g, '<br>');
+                chatHistory.innerHTML += `
+                    <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[90%] self-start shadow-sm">
+                        <p class="text-sm text-neutral-200 leading-relaxed">${formattedAnswer}</p>
+                    </div>
+                `;
+                window.scrollTo(0, document.body.scrollHeight);
+            } catch (err) {
+                document.getElementById(loaderId).remove();
+                alert("Error: " + err.message);
             }
         }
     </script>
