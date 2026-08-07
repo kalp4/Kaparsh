@@ -608,8 +608,9 @@ KAPARSH_FRONTEND = r"""
                     
                     const arrayBuffer = await AppState.file.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    const maxPages = Math.min(pdf.numPages, 25);
                     
+                    // PREVENT OOM CRASH ON MOBILE: Cap to 25 pages max for chapters
+                    const maxPages = Math.min(pdf.numPages, 25);
                     for (let i = 1; i <= maxPages; i++) {
                         const page = await pdf.getPage(i);
                         const content = await page.getTextContent();
@@ -618,6 +619,9 @@ KAPARSH_FRONTEND = r"""
                     }
                     
                     if (!fullText.trim()) throw new Error("Could not read text from this PDF. It might be scanned/image-only.");
+                    
+                    // Prevent massive payload blocks
+                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
                     
                     toggleLoader(true, 'Synthesizing knowledge vectors...');
                     response = await fetch('/api/analyze', { 
@@ -745,13 +749,13 @@ KAPARSH_FRONTEND = r"""
                     </div>
                 ` : '';
 
-                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-white leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
+                const notesList = (t.notes || []).map(n => `<li class="mb-2 flex items-start text-sm text-white leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
 
                 return `
                 <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0 break-inside-avoid">
                     <div class="flex justify-between items-start mb-3">
                         <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority}</span>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority || 'MED'}</span>
                     </div>
                     ${defsHtml}
                     ${formulasHtml}
@@ -796,13 +800,18 @@ KAPARSH_FRONTEND = r"""
                     const arrayBuffer = await AppState.syllabusFile.arrayBuffer();
                     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                     let fullText = "";
-                    for (let i = 1; i <= pdf.numPages; i++) {
+                    
+                    // PREVENT OOM CRASH ON MOBILE: Cap syllabus parsing to 10 pages
+                    const maxPages = Math.min(pdf.numPages, 10);
+                    for (let i = 1; i <= maxPages; i++) {
                         const page = await pdf.getPage(i);
                         const content = await page.getTextContent();
                         fullText += content.items.map(item => item.str).join(" ") + "\n";
                     }
                     
                     if (!fullText.trim()) throw new Error("Could not extract text. Document might be scanned.");
+                    
+                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
 
                     response = await fetch('/api/schedule', {
                         method: 'POST',
@@ -818,7 +827,11 @@ KAPARSH_FRONTEND = r"""
                 }
 
                 const rawText = await response.text();
-                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
+                if (!response.ok) {
+                    let errMsg = "Server Error";
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed or Server Error."; }
+                    throw new Error(errMsg);
+                }
                 
                 AppState.schedule = JSON.parse(rawText).schedule;
                 renderSchedule();
@@ -832,26 +845,31 @@ KAPARSH_FRONTEND = r"""
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
+            
+            if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
+                return showError("AI failed to format the schedule correctly. Please try again.");
+            }
+            
             container.innerHTML = AppState.schedule.map((day) => `
                 <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                     <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-card text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                        <span class="text-xs font-bold">${day.day}</span>
+                        <span class="text-xs font-bold">${day.day || '-'}</span>
                     </div>
                     <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline">
                         <div class="flex justify-between items-start mb-1">
-                            <span class="text-famneon text-xs font-bold">${day.date.split('-').slice(1).join('/')}</span>
-                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today}h</span>
+                            <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
+                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today || 0}h</span>
                         </div>
-                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area}</h4>
+                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Block'}</h4>
                         <div class="flex flex-col gap-2 mb-4">
-                            ${day.topics.map(t => `
+                            ${(day.topics || []).map(t => `
                                 <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
-                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name}</span>
-                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes} min</span>
+                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
+                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
                                 </div>
                             `).join('')}
                         </div>
-                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice}</p>
+                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
                     </div>
                 </div>
             `).join('');
@@ -872,6 +890,9 @@ KAPARSH_FRONTEND = r"""
                 if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
                 
                 AppState.quiz = JSON.parse(rawText).quiz;
+                
+                if (!AppState.quiz || !Array.isArray(AppState.quiz)) throw new Error("AI output was invalid.");
+                
                 renderQuiz();
                 
                 document.getElementById('quiz-setup').classList.add('hidden');
@@ -888,9 +909,9 @@ KAPARSH_FRONTEND = r"""
             container.innerHTML = AppState.quiz.map((q, index) => `
                 <div id="qcard-${index}" class="bg-card p-6 rounded-3xl border border-borderline">
                     <p class="text-blurple font-bold text-xs mb-2">QUESTION ${index + 1}</p>
-                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question}</h4>
+                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question || 'Missing question'}</h4>
                     <div class="space-y-3">
-                        ${q.options.map((opt, oIndex) => `
+                        ${(q.options || []).map((opt, oIndex) => `
                             <label class="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-borderline bg-dark active:bg-neutral-900 transition-colors">
                                 <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-5 h-5 accent-blurple bg-dark border-borderline">
                                 <span class="text-sm text-neutral-200 font-medium">${opt}</span>
