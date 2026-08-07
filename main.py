@@ -85,18 +85,19 @@ def get_topic_details():
         client = get_gemini_client()
         
         topic_name = data.get('topic')
-        covered_topics = data.get('covered_topics', '')
+        banned_terms = data.get('banned_terms', [])
         
-        ignore_prompt = f"WARNING: The following topics have ALREADY been processed. DO NOT include any definitions, formulas, or notes that belong to these topics: [{covered_topics}].\n" if covered_topics else ""
+        banned_str = ", ".join(banned_terms)
+        ignore_prompt = f"GLOBAL BAN LIST: The following terms/concepts have ALREADY been defined in previous sections: [{banned_str}]. DO NOT DEFINE THEM AGAIN. Skip them entirely if they appear.\n" if banned_terms else ""
         
         prompt = (
-            f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the topic: '{topic_name}'.\n"
+            f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
             f"{ignore_prompt}"
             "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
-            "CRITICAL ANTI-REPETITION INSTRUCTIONS (STRICTLY ENFORCED):\n"
-            "1. MUTUALLY EXCLUSIVE: If a fact, definition, or concept is placed in 'definitions', it MUST NOT be repeated in 'notes' or 'formulas'. Every single piece of information must appear exactly ONCE in the entire JSON.\n"
-            "2. NO DUPLICATE MEANINGS: Do not provide two definitions or notes that mean the exact same thing.\n"
-            "3. BE HIGHLY CONCISE: Do not use filler words. Extract only core facts.\n"
+            "CRITICAL ANTI-REPETITION INSTRUCTIONS:\n"
+            "1. Focus ONLY on the unique nuances of this specific topic. Do not summarize the whole chapter.\n"
+            "2. MUTUALLY EXCLUSIVE: If a fact is a 'definition', do not repeat it in 'notes'. Every piece of info must appear exactly ONCE.\n"
+            "3. BE HIGHLY CONCISE: Strip out filler words.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
@@ -471,7 +472,8 @@ KAPARSH_FRONTEND = """
             topics: null,
             schedule: null,
             quiz: null,
-            file: null
+            file: null,
+            globalBannedTerms: [] // The Global Memory State for Deduplication
         };
 
         const tomorrow = new Date();
@@ -534,6 +536,7 @@ KAPARSH_FRONTEND = """
             if (!AppState.file) return alert("Please upload a PDF file first.");
 
             toggleLoader(true, 'Extracting framework...');
+            AppState.globalBannedTerms = []; // Reset ban list on new upload
 
             const formData = new FormData();
             formData.append('file', AppState.file);
@@ -568,7 +571,7 @@ KAPARSH_FRONTEND = """
 
         async function fetchTopicDetails(index) {
             const topic = AppState.topics[index];
-            const covered = AppState.topics.slice(0, index).map(t => t.title).join(", ");
+            
             try {
                 const response = await fetch('/api/topic', {
                     method: 'POST',
@@ -576,11 +579,19 @@ KAPARSH_FRONTEND = """
                     body: JSON.stringify({ 
                         text: AppState.extractedText, 
                         topic: topic.title,
-                        covered_topics: covered
+                        banned_terms: AppState.globalBannedTerms
                     })
                 });
                 if (response.ok) {
                     const details = await response.json();
+                    
+                    // Add newly extracted definitions to the Global Ban List
+                    if (details.definitions && details.definitions.length > 0) {
+                        details.definitions.forEach(d => {
+                            AppState.globalBannedTerms.push(d.term);
+                        });
+                    }
+
                     AppState.topics[index] = { ...topic, ...details, loaded: true };
                     renderTopics(); 
                 }
@@ -864,7 +875,7 @@ KAPARSH_FRONTEND = """
                 
                 if (!response.ok) throw new Error(data.detail || "Server Error");
                 
-                const formattedAnswer = data.answer.replace(/\\n/g, '<br>');
+                const formattedAnswer = data.answer.replace(/\n/g, '<br>');
                 chatHistory.innerHTML += `
                     <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[90%] self-start shadow-sm">
                         <p class="text-sm text-neutral-200 leading-relaxed">${formattedAnswer}</p>
