@@ -288,14 +288,12 @@
                 const data = JSON.parse(rawText);
                 AppState.extractedText = data.extracted_text;
                 
-                // Initialize topics with loading state
                 AppState.topics = data.topics.map(t => ({ title: t.title, loaded: false }));
                 
                 renderTopics();
                 tabBtns[0].click();
                 toggleLoader(false);
                 
-                // Micro-tasking sequential loads
                 for (let i = 0; i < AppState.topics.length; i++) {
                     await fetchTopicDetails(i);
                     await new Promise(resolve => setTimeout(resolve, 1000));

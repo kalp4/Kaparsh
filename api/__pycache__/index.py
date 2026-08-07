@@ -43,6 +43,11 @@ def get_gemini_client():
         raise HTTPException(status_code=500, detail=f"Failed to initialize Gemini Client: {str(e)}")
 
 
+@app.get("/api/health")
+async def health_check():
+    return {"status": "EduCoPilot Backend is Live and Ready!"}
+
+
 @app.post("/api/analyze")
 async def analyze_pdf(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".pdf"):
@@ -63,7 +68,6 @@ async def analyze_pdf(file: UploadFile = File(...)):
             
         client = get_gemini_client()
         
-        # PHASE 1: Extract the Topic Names
         prompt = (
             "You are an AI study assistant. Read the following text and identify the 4 to 6 most important core topics. "
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
@@ -97,7 +101,6 @@ async def get_topic_details(req: TopicDetailRequest):
     try:
         client = get_gemini_client()
         
-        # PHASE 2: Extract detailed notes and formulas for one specific topic
         prompt = (
             f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{req.topic}'.\n"
             "Return ONLY a JSON object with this exact structure:\n"
@@ -193,5 +196,3 @@ async def generate_quiz(req: QuizRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Quiz generation failed: {str(e)}")
-
-# Note: No app.mount() here anymore! Vercel handles the static files natively.
