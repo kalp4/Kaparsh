@@ -48,10 +48,9 @@ def analyze_pdf():
             
         client = get_gemini_client()
         
-        # PROMPT UPGRADE: Fully dynamic topic extraction based on document density
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
-            "Do NOT limit yourself to a specific number. Extract as many or as few core topics as naturally exist in the text (it could be 2, it could be 20). "
+            "Do NOT limit yourself to a specific number. Extract as many or as few core topics as naturally exist in the text. "
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
             '  "topics": [\n'

@@ -4,52 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduCoPilot — AI Study & Revision Agent</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        vibrant: {
-                            blue: '#3b82f6',
-                            indigo: '#6366f1',
-                            purple: '#8b5cf6',
-                            fuchsia: '#d946ef',
-                            pink: '#ec4899',
-                        }
-                    },
-                    animation: {
-                        'gradient-x': 'gradient-x 3s ease infinite',
-                        'blob': 'blob 7s infinite',
-                    },
-                    keyframes: {
-                        'gradient-x': {
-                            '0%, 100%': {
-                                'background-size': '200% 200%',
-                                'background-position': 'left center'
-                            },
-                            '50%': {
-                                'background-size': '200% 200%',
-                                'background-position': 'right center'
-                            },
-                        },
-                        'blob': {
-                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
-                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
-                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
-                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        body {
+            background-color: #fafafa;
+            color: #171717;
+        }
         .loader {
-            border-top-color: #8b5cf6;
+            border-top-color: #171717;
             -webkit-animation: spinner 1s linear infinite;
             animation: spinner 1s linear infinite;
         }
@@ -58,168 +21,143 @@
             100% { transform: rotate(360deg); }
         }
         .drag-active {
-            border-color: #8b5cf6 !important;
-            background-color: #f5f3ff !important;
+            border-color: #171717 !important;
+            background-color: #f5f5f5 !important;
         }
         .tab-active {
-            border-bottom: 3px solid #8b5cf6;
-            color: #8b5cf6;
-            font-weight: 700;
+            border-bottom: 2px solid #171717;
+            color: #171717;
+            font-weight: 500;
         }
-        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen font-sans selection:bg-vibrant-fuchsia selection:text-white relative overflow-x-hidden">
-
-    <!-- Decorative Background Blobs -->
-    <div class="absolute top-0 -left-4 w-72 h-72 bg-vibrant-purple rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob pointer-events-none"></div>
-    <div class="absolute top-0 -right-4 w-72 h-72 bg-vibrant-fuchsia rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000 pointer-events-none"></div>
-    <div class="absolute -bottom-8 left-20 w-72 h-72 bg-vibrant-blue rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
+<body class="min-h-screen font-sans antialiased selection:bg-neutral-200 selection:text-black">
 
     <!-- Header -->
-    <header class="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/50 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between relative z-10">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-vibrant-blue via-vibrant-indigo to-vibrant-purple flex items-center justify-center text-white shadow-lg shadow-vibrant-indigo/30">
-                    <i class="fa-solid fa-bolt text-lg"></i>
+    <header class="bg-white border-b border-neutral-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 bg-neutral-900 rounded flex items-center justify-center text-white">
+                    <i class="fa-solid fa-graduation-cap text-xs"></i>
                 </div>
-                <h1 class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-vibrant-indigo to-vibrant-fuchsia">EduCoPilot</h1>
+                <h1 class="text-lg font-semibold tracking-tight text-neutral-900">EduCoPilot</h1>
             </div>
         </div>
     </header>
 
-    <!-- Main Layout Grid -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
+    <!-- Main Layout -->
+    <main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        <!-- Left Sidebar: Configuration & Upload -->
+        <!-- Sidebar -->
         <aside class="lg:col-span-4 flex flex-col gap-6">
-            <div class="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-xl shadow-slate-200/50 p-6">
-                <h2 class="text-lg font-bold mb-5 flex items-center gap-2 text-slate-800">
-                    <i class="fa-solid fa-sliders text-vibrant-indigo"></i> Configuration
-                </h2>
+            <div class="bg-white border border-neutral-200 p-6 shadow-sm">
+                <h2 class="text-sm font-semibold mb-6 text-neutral-900 uppercase tracking-wide">Document Setup</h2>
                 
                 <div class="space-y-5">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-slate-500">Exam Date</label>
-                            <input type="date" id="exam-date" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-vibrant-purple focus:border-transparent outline-none transition shadow-sm font-medium text-slate-700">
+                            <label class="block text-xs font-medium text-neutral-500 mb-1.5">Exam Date</label>
+                            <input type="date" id="exam-date" class="w-full px-3 py-2 border border-neutral-300 text-sm focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 outline-none transition-colors rounded-none bg-transparent">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider mb-2 text-slate-500">Hours / Day</label>
-                            <input type="number" id="study-hours" value="2" min="1" max="16" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:ring-2 focus:ring-vibrant-purple focus:border-transparent outline-none transition shadow-sm font-medium text-slate-700">
+                            <label class="block text-xs font-medium text-neutral-500 mb-1.5">Hours / Day</label>
+                            <input type="number" id="study-hours" value="2" min="1" max="16" class="w-full px-3 py-2 border border-neutral-300 text-sm focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900 outline-none transition-colors rounded-none bg-transparent">
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-8 pt-6 border-t border-slate-100">
-                    <label class="block text-xs font-bold uppercase tracking-wider mb-3 text-slate-500">Upload Source Material</label>
-                    <div id="drop-zone" class="border-2 border-dashed border-vibrant-indigo/30 bg-vibrant-indigo/5 rounded-2xl p-8 text-center transition-all hover:bg-vibrant-indigo/10 hover:border-vibrant-indigo cursor-pointer group">
-                        <div class="w-16 h-16 mx-auto bg-white rounded-full flex items-center justify-center shadow-md mb-4 group-hover:scale-110 transition-transform">
-                            <i class="fa-solid fa-file-pdf text-2xl text-vibrant-fuchsia"></i>
-                        </div>
-                        <p class="text-base text-slate-800 mb-1 font-bold">Drop PDF Here</p>
-                        <p id="file-name" class="text-xs text-slate-500 font-medium">Auto-scales to your document size</p>
+                <div class="mt-6 pt-6 border-t border-neutral-100">
+                    <label class="block text-xs font-medium text-neutral-500 mb-2">Upload Syllabus / Notes</label>
+                    <div id="drop-zone" class="border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center hover:bg-neutral-100 transition-colors cursor-pointer">
+                        <i class="fa-regular fa-file-pdf text-xl text-neutral-400 mb-2"></i>
+                        <p class="text-sm text-neutral-900 font-medium">Select PDF file</p>
+                        <p id="file-name" class="text-xs text-neutral-500 mt-1">Supports up to 25 pages</p>
                         <input type="file" id="file-upload" accept=".pdf" class="hidden">
                     </div>
                 </div>
 
-                <button id="analyze-btn" class="w-full mt-8 bg-gradient-to-r from-vibrant-blue via-vibrant-indigo to-vibrant-fuchsia hover:shadow-lg hover:shadow-vibrant-purple/40 text-white font-bold py-4 px-4 rounded-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 bg-size-200 animate-gradient-x">
-                    <span>Ignite Analysis</span>
-                    <i class="fa-solid fa-rocket"></i>
+                <button id="analyze-btn" class="w-full mt-6 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium py-3 px-4 transition-colors">
+                    Process Document
                 </button>
             </div>
         </aside>
 
-        <!-- Right Panel: Tabs & Results -->
+        <!-- Main Content Area -->
         <section class="lg:col-span-8">
-            <div class="bg-white/80 backdrop-blur-xl rounded-2xl border border-white shadow-xl shadow-slate-200/50 min-h-[650px] flex flex-col overflow-hidden">
+            <div class="bg-white border border-neutral-200 min-h-[600px] flex flex-col shadow-sm">
                 
-                <!-- Tab Headers -->
-                <div class="flex border-b border-slate-100 bg-white/50">
-                    <button class="tab-btn flex-1 py-5 text-sm font-semibold text-slate-500 hover:text-vibrant-indigo transition tab-active flex items-center justify-center gap-2" data-target="tab-summary">
-                        <i class="fa-solid fa-book-open text-lg"></i> Core Framework
+                <!-- Tabs -->
+                <div class="flex border-b border-neutral-200 bg-neutral-50/50">
+                    <button class="tab-btn flex-1 py-3 text-sm text-neutral-500 hover:text-neutral-900 transition-colors tab-active" data-target="tab-summary">
+                        Extracted Notes
                     </button>
-                    <button class="tab-btn flex-1 py-5 text-sm font-semibold text-slate-500 hover:text-vibrant-indigo transition flex items-center justify-center gap-2" data-target="tab-schedule">
-                        <i class="fa-solid fa-calendar-day text-lg"></i> Mastery Plan
+                    <button class="tab-btn flex-1 py-3 text-sm text-neutral-500 hover:text-neutral-900 transition-colors" data-target="tab-schedule">
+                        Study Schedule
                     </button>
-                    <button class="tab-btn flex-1 py-5 text-sm font-semibold text-slate-500 hover:text-vibrant-indigo transition flex items-center justify-center gap-2" data-target="tab-quiz">
-                        <i class="fa-solid fa-brain text-lg"></i> Quiz Engine
+                    <button class="tab-btn flex-1 py-3 text-sm text-neutral-500 hover:text-neutral-900 transition-colors" data-target="tab-quiz">
+                        Practice Exam
                     </button>
                 </div>
 
-                <!-- Global Loader -->
+                <!-- Loader -->
                 <div id="global-loader" class="hidden flex-1 flex flex-col items-center justify-center p-12">
-                    <div class="relative w-20 h-20 mb-6">
-                        <div class="absolute inset-0 rounded-full border-4 border-slate-100"></div>
-                        <div class="absolute inset-0 rounded-full border-4 border-vibrant-fuchsia border-t-transparent animate-spin"></div>
-                        <div class="absolute inset-2 rounded-full border-4 border-vibrant-blue border-b-transparent animate-spin border-opacity-60 animation-reverse"></div>
-                    </div>
-                    <p id="loader-text" class="text-base text-slate-600 font-bold bg-clip-text text-transparent bg-gradient-to-r from-vibrant-indigo to-vibrant-fuchsia animate-pulse">Mapping Knowledge Vectors...</p>
+                    <div class="loader w-8 h-8 border-2 border-neutral-200 rounded-full mb-4"></div>
+                    <p id="loader-text" class="text-sm text-neutral-500">Analyzing document structure...</p>
                 </div>
 
                 <!-- Empty State -->
                 <div id="empty-state" class="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                    <div class="w-24 h-24 bg-gradient-to-br from-vibrant-indigo/20 to-vibrant-fuchsia/20 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                        <i class="fa-solid fa-wand-magic-sparkles text-4xl text-vibrant-purple"></i>
+                    <div class="w-12 h-12 bg-neutral-100 flex items-center justify-center mb-4 rounded-full">
+                        <i class="fa-solid fa-align-left text-neutral-400"></i>
                     </div>
-                    <h3 class="text-2xl font-extrabold text-slate-800 mb-2">Ready for Ingestion</h3>
-                    <p class="text-base text-slate-500 max-w-md">Upload your material. We will dynamically extract every core topic, construct analogies, and build your ultimate study plan.</p>
+                    <h3 class="text-base font-medium text-neutral-900 mb-1">No document loaded</h3>
+                    <p class="text-sm text-neutral-500 max-w-sm">Upload a PDF to generate structured study notes, timelines, and assessments.</p>
                 </div>
 
-                <!-- Tab Contents Area -->
+                <!-- Tab Contents -->
                 <div id="tabs-container" class="hidden flex-1 p-8 overflow-y-auto">
                     
-                    <!-- Tab 1: Summary -->
+                    <!-- Notes Tab -->
                     <div id="tab-summary" class="tab-pane block">
-                        <div class="flex justify-between items-end mb-8 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                            <div>
-                                <h2 class="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-vibrant-indigo to-vibrant-fuchsia">Knowledge Matrix</h2>
-                                <p class="text-sm text-slate-500 mt-2 font-medium">Dynamically extracted frameworks & real-world analogies.</p>
-                            </div>
-                            <span id="topic-count" class="px-4 py-2 bg-white text-vibrant-purple border border-vibrant-purple/20 text-sm font-bold uppercase tracking-wider rounded-xl shadow-sm"></span>
+                        <div class="flex justify-between items-center mb-8 pb-4 border-b border-neutral-100">
+                            <h2 class="text-xl font-semibold text-neutral-900">Study Notes</h2>
+                            <span id="topic-count" class="text-xs font-medium text-neutral-500 bg-neutral-100 px-2 py-1 rounded"></span>
                         </div>
-                        <div id="topics-grid" class="flex flex-col gap-8">
+                        <div id="topics-grid" class="flex flex-col gap-6">
                             <!-- Injected by JS -->
                         </div>
                     </div>
 
-                    <!-- Tab 2: Schedule -->
+                    <!-- Schedule Tab -->
                     <div id="tab-schedule" class="tab-pane hidden">
-                        <div id="schedule-setup" class="text-center py-24">
-                            <div class="w-20 h-20 mx-auto bg-vibrant-blue/10 rounded-2xl flex items-center justify-center mb-6 transform rotate-3">
-                                <i class="fa-solid fa-route text-4xl text-vibrant-blue"></i>
-                            </div>
-                            <h3 class="text-2xl font-extrabold text-slate-800 mb-3">Algorithmic Spaced Repetition</h3>
-                            <p class="text-base text-slate-500 mb-8 max-w-md mx-auto">Optimize your memory retention curves by scheduling the dynamically extracted topics across your available days.</p>
-                            <button onclick="generateSchedule()" class="px-8 py-4 bg-gradient-to-r from-vibrant-blue to-vibrant-indigo hover:shadow-lg hover:shadow-vibrant-blue/30 text-white font-bold rounded-xl transition-all transform hover:-translate-y-1">
-                                Generate Study Timeline
+                        <div id="schedule-setup" class="text-center py-16">
+                            <h3 class="text-lg font-semibold text-neutral-900 mb-2">Generate Study Schedule</h3>
+                            <p class="text-sm text-neutral-500 mb-6">Create a timeline based on spaced repetition principles.</p>
+                            <button onclick="generateSchedule()" class="px-6 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition-colors">
+                                Generate Plan
                             </button>
                         </div>
-                        <div id="schedule-result" class="hidden space-y-6">
+                        <div id="schedule-result" class="hidden space-y-4">
                             <!-- Injected by JS -->
                         </div>
                     </div>
 
-                    <!-- Tab 3: Quiz -->
+                    <!-- Quiz Tab -->
                     <div id="tab-quiz" class="tab-pane hidden">
-                        <div id="quiz-setup" class="text-center py-24">
-                            <div class="w-20 h-20 mx-auto bg-vibrant-fuchsia/10 rounded-2xl flex items-center justify-center mb-6 transform -rotate-3">
-                                <i class="fa-solid fa-microscope text-4xl text-vibrant-fuchsia"></i>
-                            </div>
-                            <h3 class="text-2xl font-extrabold text-slate-800 mb-3">Deep Synthesis Assessment</h3>
-                            <p class="text-base text-slate-500 mb-8 max-w-md mx-auto">Validate your understanding against tricky distractor questions designed specifically from your material.</p>
-                            <button onclick="generateQuiz()" class="px-8 py-4 bg-gradient-to-r from-vibrant-purple to-vibrant-fuchsia hover:shadow-lg hover:shadow-vibrant-fuchsia/30 text-white font-bold rounded-xl transition-all transform hover:-translate-y-1">
-                                Initialize Exam
+                        <div id="quiz-setup" class="text-center py-16">
+                            <h3 class="text-lg font-semibold text-neutral-900 mb-2">Practice Examination</h3>
+                            <p class="text-sm text-neutral-500 mb-6">Test your comprehension with an AI-generated assessment.</p>
+                            <button onclick="generateQuiz()" class="px-6 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition-colors">
+                                Start Exam
                             </button>
                         </div>
                         <div id="quiz-result" class="hidden space-y-8">
                             <div id="quiz-questions-container" class="space-y-8"></div>
-                            <button onclick="checkAnswers()" class="w-full py-5 bg-slate-900 text-white font-extrabold text-lg rounded-2xl mt-8 hover:bg-slate-800 transition-colors shadow-xl">
-                                Submit Assessment
+                            <button onclick="checkAnswers()" class="w-full py-3 bg-neutral-900 text-white text-sm font-medium hover:bg-neutral-800 transition-colors">
+                                Submit Answers
                             </button>
                             <div id="quiz-score-area"></div>
                         </div>
@@ -248,11 +186,11 @@
         const fileNameDisplay = document.getElementById('file-name');
 
         dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
-        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-active'); });
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-neutral-100'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('bg-neutral-100'); });
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('drag-active');
+            dropZone.classList.remove('bg-neutral-100');
             if (e.dataTransfer.files.length) {
                 fileInput.files = e.dataTransfer.files;
                 handleFileSelect();
@@ -265,7 +203,7 @@
             if (fileInput.files.length > 0) {
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
-                fileNameDisplay.classList.add('text-vibrant-indigo', 'font-bold');
+                fileNameDisplay.classList.add('text-neutral-900');
             }
         }
 
@@ -306,7 +244,7 @@
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF file.");
 
-            toggleLoader(true, 'Extracting Dynamic Framework...');
+            toggleLoader(true, 'Extracting framework...');
 
             const formData = new FormData();
             formData.append('file', AppState.file);
@@ -327,7 +265,6 @@
                 const data = JSON.parse(rawText);
                 AppState.extractedText = data.extracted_text;
                 
-                // Dynamically initialize however many topics the AI found
                 AppState.topics = data.topics.map(t => ({ title: t.title, loaded: false }));
                 
                 renderTopics();
@@ -375,81 +312,61 @@
 
         function renderTopics() {
             const grid = document.getElementById('topics-grid');
-            document.getElementById('topic-count').innerText = `${AppState.topics.length} Dynamic Topics Extracted`;
+            document.getElementById('topic-count').innerText = `${AppState.topics.length} Topics`;
             
-            grid.innerHTML = AppState.topics.map((t, i) => {
-                
-                // Color array for dynamic top borders
-                const borderColors = ['border-t-vibrant-blue', 'border-t-vibrant-indigo', 'border-t-vibrant-purple', 'border-t-vibrant-fuchsia', 'border-t-vibrant-pink'];
-                const topBorder = borderColors[i % borderColors.length];
-
+            grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
-                    <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/40 relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-full h-1 bg-slate-200 animate-pulse"></div>
-                        <div class="flex justify-between items-center mb-6">
-                            <h4 class="font-extrabold text-xl text-slate-800 pr-2">${t.title}</h4>
-                            <div class="flex gap-2">
-                                <div class="w-3 h-3 bg-vibrant-blue rounded-full animate-bounce"></div>
-                                <div class="w-3 h-3 bg-vibrant-indigo rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                <div class="w-3 h-3 bg-vibrant-fuchsia rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                            </div>
+                    <div class="border border-neutral-200 p-6 opacity-60">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="font-medium text-base text-neutral-900">${t.title}</h4>
+                            <span class="text-xs text-neutral-400 font-medium">Loading...</span>
                         </div>
-                        <div class="space-y-3 mt-4">
-                            <div class="h-3 bg-slate-100 rounded-md w-3/4 animate-pulse"></div>
-                            <div class="h-3 bg-slate-100 rounded-md w-1/2 animate-pulse"></div>
-                            <div class="h-3 bg-slate-100 rounded-md w-5/6 animate-pulse"></div>
+                        <div class="space-y-2 mt-2">
+                            <div class="h-1.5 bg-neutral-200 w-3/4"></div>
+                            <div class="h-1.5 bg-neutral-200 w-1/2"></div>
+                            <div class="h-1.5 bg-neutral-200 w-5/6"></div>
                         </div>
                     </div>`;
                 }
 
                 const priorityStyles = {
-                    'High': 'bg-red-50 text-red-600 border-red-200',
-                    'Medium': 'bg-amber-50 text-amber-600 border-amber-200',
-                    'Low': 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                    'High': 'text-neutral-900 border-neutral-900',
+                    'Medium': 'text-neutral-500 border-neutral-300',
+                    'Low': 'text-neutral-400 border-neutral-200'
                 };
                 const pStyle = priorityStyles[t.priority] || priorityStyles['Medium'];
                 
-                const notesList = t.notes.map(n => `<li class="mb-3 flex items-start text-base text-slate-700 leading-relaxed"><div class="mt-1.5 mr-3 w-1.5 h-1.5 rounded-full bg-vibrant-indigo flex-shrink-0"></div>${n}</li>`).join('');
+                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-700 leading-relaxed"><span class="text-neutral-300 mr-2">—</span>${n}</li>`).join('');
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div class="my-6 space-y-3">
+                    <div class="my-4 space-y-2">
                         ${t.formulas.map(f => `
-                            <div class="bg-gradient-to-r from-slate-50 to-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center gap-5 group hover:border-vibrant-purple/30 transition-colors">
-                                <div class="w-12 h-12 rounded-xl bg-white flex-shrink-0 flex items-center justify-center text-vibrant-fuchsia border border-slate-100 shadow-sm group-hover:scale-110 transition-transform">
-                                    <i class="fa-solid fa-square-root-variable text-lg"></i>
-                                </div>
-                                <div>
-                                    <p class="font-mono text-xl font-bold text-slate-900">${f.equation}</p>
-                                    <p class="text-xs font-bold text-vibrant-indigo uppercase tracking-wider mt-1">${f.meaning}</p>
-                                </div>
+                            <div class="bg-neutral-50 border border-neutral-200 p-3 flex flex-col gap-1">
+                                <p class="font-mono text-sm font-medium text-neutral-900">${f.equation}</p>
+                                <p class="text-[11px] text-neutral-500 uppercase tracking-wider">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
                 return `
-                <div class="bg-white p-8 rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 border-t-4 ${topBorder} hover:shadow-2xl hover:shadow-vibrant-indigo/10 transition-all transform hover:-translate-y-1">
-                    <div class="flex justify-between items-start mb-6">
-                        <h4 class="font-extrabold text-2xl tracking-tight text-slate-900 pr-4">${t.title}</h4>
-                        <span class="text-xs font-black px-3 py-1.5 rounded-lg border uppercase tracking-wider ${pStyle}">${t.priority}</span>
+                <div class="border border-neutral-200 p-6 hover:border-neutral-300 transition-colors">
+                    <div class="flex justify-between items-start mb-4">
+                        <h4 class="font-semibold text-lg text-neutral-900 pr-4">${t.title}</h4>
+                        <span class="text-[10px] font-medium px-2 py-0.5 border uppercase tracking-wider ${pStyle}">${t.priority}</span>
                     </div>
                     
-                    <ul class="mb-2">
+                    <ul class="mb-4">
                         ${notesList}
                     </ul>
                     
                     ${formulasHtml}
                     
-                    <div class="mt-8 pt-6 border-t border-slate-100">
-                        <div class="bg-gradient-to-br from-vibrant-indigo/5 to-vibrant-fuchsia/5 p-6 rounded-xl border border-vibrant-indigo/10 relative overflow-hidden">
-                            <div class="absolute -right-4 -top-4 text-6xl text-vibrant-purple/10">
-                                <i class="fa-solid fa-lightbulb"></i>
-                            </div>
-                            <p class="text-xs font-black uppercase text-vibrant-fuchsia mb-3 tracking-widest flex items-center gap-2 relative z-10">
-                                <i class="fa-solid fa-bolt"></i> Real-World Analogy
-                            </p>
-                            <p class="text-base text-slate-800 font-medium leading-relaxed relative z-10">${t.analogy}</p>
+                    <div class="mt-4 pt-4 border-t border-neutral-100">
+                        <div class="border-l-2 border-neutral-900 pl-4 py-1">
+                            <p class="text-[10px] uppercase font-semibold text-neutral-500 mb-1 tracking-wider">Analogy</p>
+                            <p class="text-sm text-neutral-700 leading-relaxed">${t.analogy}</p>
                         </div>
                     </div>
                 </div>
@@ -462,7 +379,7 @@
             if (!examDate) return alert("Please set an exam date.");
 
             const loadedTopics = AppState.topics.filter(t => t.loaded);
-            toggleLoader(true, 'Calculating cognitive retention curves...');
+            toggleLoader(true, 'Structuring timeline...');
 
             try {
                 const response = await fetch('/api/schedule', {
@@ -485,38 +402,28 @@
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
-            container.innerHTML = AppState.schedule.map((day, i) => `
-                <div class="flex gap-6 p-6 bg-white rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/40 group hover:border-vibrant-blue/30 transition-colors">
-                    <div class="flex-shrink-0 text-center px-6 border-r border-slate-100 flex flex-col justify-center items-center">
-                        <span class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-1">Day ${day.day}</span>
-                        <div class="w-14 h-14 bg-vibrant-blue/10 text-vibrant-blue rounded-xl flex items-center justify-center font-black text-xl shadow-inner">
-                            ${day.date.split('-')[2]}
-                        </div>
-                        <span class="text-xs font-medium text-slate-500 mt-2">${day.date.split('-').slice(0,2).join('/')}</span>
+            container.innerHTML = AppState.schedule.map((day) => `
+                <div class="flex gap-4 p-5 border border-neutral-200 hover:bg-neutral-50 transition-colors">
+                    <div class="flex-shrink-0 text-center pr-5 border-r border-neutral-200 flex flex-col justify-center">
+                        <span class="text-[10px] text-neutral-500 font-medium uppercase tracking-widest mb-1">Day ${day.day}</span>
+                        <span class="text-lg font-semibold text-neutral-900">${day.date.split('-').slice(1).join('/')}</span>
                     </div>
-                    <div class="flex-1 py-2">
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <h4 class="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                                    <i class="fa-solid fa-crosshairs text-vibrant-blue"></i> ${day.focus_area}
-                                </h4>
-                            </div>
-                            <span class="text-xs font-black bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg flex items-center gap-1"><i class="fa-regular fa-clock"></i> ${day.hours_allocated} hrs</span>
+                    <div class="flex-1 py-1 pl-1">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-medium text-neutral-900 text-sm">${day.focus_area}</h4>
+                            <span class="text-xs font-medium text-neutral-500">${day.hours_allocated} hrs</span>
                         </div>
-                        <div class="flex flex-wrap gap-2 mb-4 mt-3">
-                            ${day.topics_to_study.map(t => `<span class="text-xs px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-bold shadow-sm">${t}</span>`).join('')}
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            ${day.topics_to_study.map(t => `<span class="text-xs px-2 py-1 bg-white border border-neutral-200 text-neutral-700 font-medium">${t}</span>`).join('')}
                         </div>
-                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
-                            <i class="fa-solid fa-arrow-trend-up text-vibrant-indigo mt-1"></i>
-                            <p class="text-sm text-slate-700 font-medium leading-relaxed">${day.actionable_advice}</p>
-                        </div>
+                        <p class="text-xs text-neutral-600 leading-relaxed">${day.actionable_advice}</p>
                     </div>
                 </div>
             `).join('');
         }
 
         async function generateQuiz() {
-            toggleLoader(true, 'Generating tricky distractor questions...');
+            toggleLoader(true, 'Generating questions...');
             const loadedTopics = AppState.topics.filter(t => t.loaded);
 
             try {
@@ -543,18 +450,17 @@
             document.getElementById('quiz-score-area').innerHTML = ''; 
 
             container.innerHTML = AppState.quiz.map((q, index) => `
-                <div id="qcard-${index}" class="p-8 bg-white rounded-2xl border border-slate-100 shadow-xl shadow-slate-200/40 relative">
-                    <div class="absolute -left-3 top-8 w-6 h-6 bg-vibrant-fuchsia text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md border-2 border-white">${index + 1}</div>
-                    <h4 class="font-extrabold text-xl mb-6 text-slate-900 leading-tight">${q.question}</h4>
-                    <div class="space-y-3">
+                <div id="qcard-${index}" class="p-6 border border-neutral-200">
+                    <h4 class="font-medium text-base mb-4 text-neutral-900 leading-relaxed"><span class="text-neutral-400 mr-2">${index + 1}.</span> ${q.question}</h4>
+                    <div class="space-y-2">
                         ${q.options.map((opt, oIndex) => `
-                            <label class="flex items-center gap-4 cursor-pointer group p-4 rounded-xl border border-slate-100 hover:border-vibrant-fuchsia hover:bg-vibrant-fuchsia/5 transition-all">
-                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-5 h-5 text-vibrant-fuchsia focus:ring-vibrant-fuchsia border-slate-300">
-                                <span class="text-base text-slate-700 font-medium group-hover:text-slate-900 transition">${opt}</span>
+                            <label class="flex items-start gap-3 cursor-pointer p-3 border border-transparent hover:bg-neutral-50 transition-colors">
+                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="mt-1 w-4 h-4 text-neutral-900 focus:ring-neutral-900 border-neutral-300">
+                                <span class="text-sm text-neutral-700">${opt}</span>
                             </label>
                         `).join('')}
                     </div>
-                    <div id="result-${index}" class="mt-6"></div>
+                    <div id="result-${index}" class="mt-4"></div>
                 </div>
             `).join('');
         }
@@ -567,46 +473,37 @@
                 const card = document.getElementById(`qcard-${index}`);
                 
                 if (!selected) {
-                    resultDiv.innerHTML = `<div class="p-4 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl font-bold text-sm flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i> Selection Required</div>`;
+                    resultDiv.innerHTML = `<div class="text-sm text-neutral-500 font-medium py-2">Please select an answer.</div>`;
                     return;
                 }
                 
                 if (selected.value === q.correct_answer) {
                     score++;
                     resultDiv.innerHTML = `
-                        <div class="p-5 bg-emerald-50 rounded-xl border border-emerald-200 shadow-sm">
-                            <p class="text-emerald-700 font-extrabold text-base mb-2 flex items-center gap-2"><i class="fa-solid fa-circle-check text-xl"></i> Precision Strike: Correct</p>
-                            <p class="text-sm text-emerald-800 font-medium leading-relaxed">${q.explanation}</p>
+                        <div class="p-4 bg-neutral-50 border-t border-neutral-200 mt-4">
+                            <p class="text-neutral-900 font-medium text-sm mb-1">Correct</p>
+                            <p class="text-sm text-neutral-600 leading-relaxed">${q.explanation}</p>
                         </div>`;
-                    card.classList.add('border-emerald-400', 'ring-4', 'ring-emerald-50');
-                    card.classList.remove('border-slate-100');
+                    card.classList.add('border-neutral-400');
+                    card.classList.remove('border-neutral-200');
                 } else {
                     resultDiv.innerHTML = `
-                        <div class="p-6 bg-rose-50 rounded-xl border border-rose-200 shadow-sm">
-                            <p class="text-rose-700 font-extrabold text-base mb-3 flex items-center gap-2"><i class="fa-solid fa-circle-xmark text-xl"></i> Incorrect Calculation</p>
-                            <p class="text-sm mb-4 text-slate-700 font-medium">Verified Answer: <strong class="font-bold text-slate-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 ml-2 shadow-sm">${q.correct_answer}</strong></p>
-                            <div class="h-px w-full bg-rose-200 mb-4"></div>
-                            <p class="text-[10px] uppercase font-black text-rose-500 mb-2 tracking-widest">Distractor Analysis</p>
-                            <p class="text-sm text-rose-900 font-medium leading-relaxed">${q.explanation}</p>
+                        <div class="p-4 bg-neutral-50 border-t border-neutral-200 mt-4">
+                            <p class="text-neutral-900 font-medium text-sm mb-2">Incorrect</p>
+                            <p class="text-sm mb-3 text-neutral-700">Correct Answer: <span class="font-medium text-neutral-900">${q.correct_answer}</span></p>
+                            <p class="text-[10px] uppercase font-semibold text-neutral-500 mb-1 tracking-wider">Explanation</p>
+                            <p class="text-sm text-neutral-600 leading-relaxed">${q.explanation}</p>
                         </div>`;
-                    card.classList.add('border-rose-400', 'ring-4', 'ring-rose-50');
-                    card.classList.remove('border-slate-100');
+                    card.classList.add('border-neutral-400');
+                    card.classList.remove('border-neutral-200');
                 }
             });
             
             if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
-                const percentage = (score / AppState.quiz.length) * 100;
-                let message = percentage === 100 ? "Flawless Execution. You have achieved mastery." : "Review the distractor analysis to patch your knowledge gaps.";
-                
                 document.getElementById('quiz-score-area').innerHTML = `
-                    <div class="mt-10 p-10 bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl text-center text-white shadow-2xl relative overflow-hidden">
-                        <div class="absolute top-0 right-0 w-64 h-64 bg-vibrant-fuchsia rounded-full mix-blend-screen filter blur-3xl opacity-20"></div>
-                        <div class="absolute bottom-0 left-0 w-64 h-64 bg-vibrant-blue rounded-full mix-blend-screen filter blur-3xl opacity-20"></div>
-                        <div class="relative z-10">
-                            <p class="text-sm font-black uppercase tracking-widest text-vibrant-fuchsia mb-4">Final Assessment Score</p>
-                            <h3 class="text-6xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">${score} / ${AppState.quiz.length}</h3>
-                            <p class="text-slate-300 text-lg font-medium">${message}</p>
-                        </div>
+                    <div class="mt-8 pt-8 border-t border-neutral-200 text-center">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">Final Score</p>
+                        <h3 class="text-4xl font-bold text-neutral-900 mb-2">${score} / ${AppState.quiz.length}</h3>
                     </div>
                 `;
             }
