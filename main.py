@@ -31,41 +31,46 @@ def analyze_pdf():
         text = ""
         client = get_gemini_client()
         
-        # Route 1: Image Upload (Direct OCR via Gemini)
         if 'file' in request.files:
             file = request.files['file']
             filename = file.filename.lower()
             
-            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+            if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+                return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
                 
-            image_bytes = file.read()
-            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            
-            transcription_response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=[
-                    "You are a highly accurate Optical Character Recognition (OCR) system. Transcribe all the readable text in this image perfectly. Do not add any extra commentary or formatting, just return the raw text.", 
-                    image_part
-                ]
-            )
-            text = transcription_response.text
-            
-        # Route 2: Pre-Extracted Text from Frontend (Bypasses Vercel 4.5MB Payload Limit)
-        elif request.is_json and 'text' in request.json:
-            text = request.json['text']
-            
+            # Safe Server-Side PDF Extraction
+            if filename.endswith(".pdf"):
+                reader = PdfReader(file)
+                # Cap to 20 pages to prevent memory limits while getting enough context
+                for page in reader.pages[:20]:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+                        
+            # Safe Server-Side Image OCR
+            else:
+                image_bytes = file.read()
+                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                
+                transcription_response = client.models.generate_content(
+                    model='gemini-3.5-flash-lite',
+                    contents=[
+                        "You are an OCR system. Transcribe all readable text in this image perfectly without commentary.", 
+                        image_part
+                    ]
+                )
+                text = transcription_response.text
+                
         else:
-            return jsonify({"detail": "No valid file or text payload provided."}), 400
+            return jsonify({"detail": "No valid file payload provided."}), 400
             
         if not text or not text.strip():
             return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
             
         prompt = (
-            "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
-            "Do NOT limit yourself to a specific number. Extract as many or as few core topics as naturally exist in the text. "
-            "CRITICAL INSTRUCTION: Ensure there are NO duplicate or heavily overlapping topics. Merge similar concepts into a single overarching topic title.\n"
+            "You are an AI study assistant. Read the following text and identify all distinct, primary concepts.\n"
+            "Ensure there are NO duplicate or heavily overlapping topics. Merge similar concepts into a single title.\n"
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
             '  "topics": [\n'
@@ -101,23 +106,22 @@ def get_topic_details():
         topic_name = data.get('topic')
         covered_topics = data.get('covered_topics', '')
         
-        ignore_prompt = f"GLOBAL BAN LIST: The following terms/concepts have ALREADY been defined in previous sections: [{covered_topics}]. DO NOT DEFINE THEM AGAIN. Skip them entirely if they appear.\n" if covered_topics else ""
+        ignore_prompt = f"GLOBAL BAN LIST: The following concepts have ALREADY been defined: [{covered_topics}]. DO NOT DEFINE THEM AGAIN.\n" if covered_topics else ""
         
         prompt = (
-            f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
+            f"Extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
             f"{ignore_prompt}"
-            "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
-            "CRITICAL ANTI-REPETITION INSTRUCTIONS:\n"
-            "1. Focus ONLY on the unique nuances of this specific topic. Do not summarize the whole chapter.\n"
-            "2. MUTUALLY EXCLUSIVE: If a fact is a 'definition', do not repeat it in 'notes'. Every piece of info must appear exactly ONCE.\n"
-            "3. BE HIGHLY CONCISE: Strip out filler words.\n"
+            "Categorize information strictly into definitions, formulas, derivations, and general notes.\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. MUTUALLY EXCLUSIVE: If a fact is a 'definition', do not repeat it in 'notes'.\n"
+            "2. BE HIGHLY CONCISE: Strip out filler words.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
-            '  "definitions": [{"term": "Exact Term", "definition": "Clear, concise definition without repeating"}], (Leave empty [] if none exist)\n'
-            '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist)\n'
-            '  "derivations": [{"title": "Derivation Name", "content": "Concise mathematical or logical steps"}], (Leave empty [] if none exist)\n'
-            '  "notes": ["Concise point 1", "Concise point 2"] (General bullet points, strictly no repetition of definitions)\n'
+            '  "definitions": [{"term": "Exact Term", "definition": "Clear definition"}],\n'
+            '  "formulas": [{"equation": "E=mc^2", "meaning": "Meaning"}],\n'
+            '  "derivations": [{"title": "Derivation Name", "content": "Steps"}],\n'
+            '  "notes": ["Concise point 1", "Concise point 2"]\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"
         )
@@ -144,39 +148,38 @@ def generate_schedule():
         topics_json = "[]"
         is_macro = False
         
-        # Route 1: Image Upload (Direct OCR via Gemini)
+        # Route 1: Syllabus File Uploaded
         if 'file' in request.files:
             is_macro = True
             file = request.files['file']
-            exam_date = request.form.get('exam_date')
+            exam_date = request.form.get('exam_date', '')
             study_hours = request.form.get('study_hours', 2)
             
             filename = file.filename.lower()
-            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+            
+            if filename.endswith(".pdf"):
+                reader = PdfReader(file)
+                for page in reader.pages[:15]: 
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+            elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                image_bytes = file.read()
+                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
                 
-            image_bytes = file.read()
-            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            
-            transcription_response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=[
-                    "Transcribe all readable text in this syllabus image perfectly. Return only raw text.", 
-                    image_part
-                ]
-            )
-            text = transcription_response.text
-            
-        # Route 2: Pre-Extracted Text from Frontend
-        elif request.is_json and 'syllabus_text' in request.json:
-            is_macro = True
-            data = request.json
-            text = data.get('syllabus_text', '')
-            exam_date = data.get('exam_date')
-            study_hours = data.get('study_hours', 2)
-            
-        # Route 3: Extracted Chapter Topics
+                transcription_response = client.models.generate_content(
+                    model='gemini-3.5-flash-lite',
+                    contents=["Transcribe readable text from this syllabus image perfectly. Raw text only.", image_part]
+                )
+                text = transcription_response.text
+            else:
+                return jsonify({"detail": "Unsupported file format."}), 400
+                
+            if not text.strip():
+                return jsonify({"detail": "Could not extract text from the syllabus."}), 400
+                
+        # Route 2: Generated Schedule via Extracted Chapter Topics
         elif request.is_json and 'topics' in request.json:
             is_macro = False
             data = request.json
@@ -188,54 +191,45 @@ def generate_schedule():
             return jsonify({"detail": "No valid data provided to build schedule."}), 400
 
         if is_macro:
-            if not text or not text.strip():
-                return jsonify({"detail": "Could not extract syllabus text. Please try a clearer document."}), 400
-                
             prompt = (
-                f"You are a Master Study Planner. The student has provided their complete course/exam syllabus below.\n"
+                f"You are a Master Study Planner. The student provided their course/exam syllabus below.\n"
                 f"Target Exam Date: {exam_date}\n"
                 f"Daily Study Hours Available: {study_hours}\n\n"
                 f"Syllabus Content:\n{text[:30000]}\n\n"
                 "CRITICAL INSTRUCTIONS:\n"
-                "1. Identify all core subjects and sub-topics from the syllabus.\n"
-                "2. Map them out into a highly realistic daily study schedule starting from Day 1 up to the Exam Date.\n"
-                "3. Allocate estimated minutes per topic. Do not exceed the daily available hours.\n"
-                "4. Mix different subjects on the same day if possible to optimize learning and prevent burnout.\n"
-                "5. Integrate Spaced Repetition (allocate specific days strictly for review of earlier topics).\n"
+                "1. Map out core subjects into a realistic daily study schedule up to the Exam Date.\n"
+                "2. Allocate estimated minutes per topic. Do not exceed daily hours.\n"
+                "3. Keep the schedule concise so it generates quickly. Group minor topics together.\n"
                 "Return ONLY a JSON object with this exact structure:\n"
                 "{\n"
                 '  "schedule": [\n'
                 '    {\n'
                 '      "day": 1, \n'
                 '      "date": "YYYY-MM-DD", \n'
-                '      "focus_area": "Subject Name - Broad Concept",\n'
+                '      "focus_area": "Subject Name",\n'
                 '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
                 '      "total_hours_today": 2.5, \n'
-                '      "actionable_advice": "Specific study technique to use today"\n'
+                '      "actionable_advice": "Advice"\n'
                 '    }\n'
                 "  ]\n"
                 "}"
             )
         else:
             prompt = (
-                f"You are a highly efficient study planner utilizing Spaced Repetition.\n"
+                f"You are a study planner utilizing Spaced Repetition.\n"
                 f"Exam Date: {exam_date}\n"
                 f"Daily Hours Available: {study_hours}\n"
                 f"Topics to map out: {topics_json}\n\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "1. DO NOT assign a flat default 2 hours per topic. Estimate realistic minutes for each topic (e.g., 15 mins for easy topics, 45 mins for complex ones).\n"
-                "2. Group multiple topics into a single day so the student can finish the syllabus early.\n"
-                "3. Optimize the schedule efficiently within the available daily hours.\n"
                 "Return ONLY a JSON object with this exact structure:\n"
                 "{\n"
                 '  "schedule": [\n'
                 '    {\n'
                 '      "day": 1, \n'
                 '      "date": "YYYY-MM-DD", \n'
-                '      "focus_area": "Initial Learning vs Active Recall",\n'
-                '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}, {"name": "Topic 2", "estimated_minutes": 15}], \n'
+                '      "focus_area": "Active Recall",\n'
+                '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}], \n'
                 '      "total_hours_today": 0.75, \n'
-                '      "actionable_advice": "Specific study technique to use today"\n'
+                '      "actionable_advice": "Advice"\n'
                 '    }\n'
                 "  ]\n"
                 "}"
@@ -260,20 +254,16 @@ def generate_quiz():
         topics_json = json.dumps(data.get('topics', []))
         
         prompt = (
-            "You are a strict examiner. Create a multiple-choice practice exam based on these topics.\n"
+            "Create a multiple-choice practice exam based on these topics.\n"
             f"Topics: {topics_json}\n\n"
-            "CRITICAL INSTRUCTIONS:\n"
-            "1. Dynamically scale the number of questions based on the number of topics (generate 1 or 2 highly challenging questions per topic).\n"
-            "2. Do not just test definitions; test application.\n"
-            "3. For the explanation, you MUST explain exactly why the correct answer is right AND why a student might be tricked by the distractors.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "quiz": [\n'
             '    {\n'
-            '      "question": "Highly challenging question...",\n'
+            '      "question": "Question...",\n'
             '      "options": ["A", "B", "C", "D"],\n'
-            '      "correct_answer": "Exact string of correct option",\n'
-            '      "explanation": "Why correct is right, and why the distractors are common traps."\n'
+            '      "correct_answer": "Exact correct option string",\n'
+            '      "explanation": "Why correct is right, and distractors are wrong."\n'
             '    }\n'
             "  ]\n"
             "}"
@@ -300,7 +290,7 @@ def answer_doubt():
             "You are a helpful expert tutor. A student has a doubt regarding their study material.\n\n"
             f"Study Material Context:\n{data.get('text')}\n\n"
             f"Student's Doubt: {data.get('question')}\n\n"
-            "Provide a clear, concise, and accurate explanation based ONLY on the context provided. If the answer is not in the text, explain the concept generally but gently mention that the specific detail is outside the provided text."
+            "Provide a clear, concise, and accurate explanation based ONLY on the context provided."
         )
         
         response = client.models.generate_content(
@@ -324,7 +314,6 @@ KAPARSH_FRONTEND = r"""
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kaparsh</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -346,11 +335,8 @@ KAPARSH_FRONTEND = r"""
             }
         }
     </script>
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf & pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         body { background-color: #000; color: #fff; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
         ::selection { background: transparent; }
@@ -368,7 +354,6 @@ KAPARSH_FRONTEND = r"""
 
     <div class="max-w-md mx-auto min-h-screen bg-dark relative border-x border-borderline shadow-2xl">
         
-        <!-- Header -->
         <header class="sticky top-0 z-40 bg-dark/80 backdrop-blur-md border-b border-borderline px-4 py-3 flex justify-between items-center" data-html2canvas-ignore>
             <h1 class="text-xl font-bold tracking-tight">Kaparsh</h1>
             <button id="download-btn" onclick="downloadNotes()" class="hidden w-8 h-8 rounded-full bg-card border border-borderline flex items-center justify-center active:scale-95 transition-transform">
@@ -377,9 +362,12 @@ KAPARSH_FRONTEND = r"""
         </header>
 
         <main class="w-full">
+            
+            <!-- Upgraded Master Loader -->
             <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
                 <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
-                <p id="loader-text" class="text-sm font-semibold text-neutral-400">Processing...</p>
+                <p id="loader-title" class="text-base font-bold text-white mb-2">Processing Document...</p>
+                <p id="loader-text" class="text-xs font-semibold text-neutral-400">Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)</p>
             </div>
 
             <!-- Tab: Home (Micro Analyzer) -->
@@ -407,7 +395,6 @@ KAPARSH_FRONTEND = r"""
                         <i class="fa-solid fa-image text-xl text-famneon"></i>
                     </div>
                     <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Chapter (PDF/Img)</p>
-                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Extracts locally on your device.</p>
                     <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                 </label>
 
@@ -430,7 +417,7 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule -->
+            <!-- Tab: Schedule (Master Syllabus Planner) -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
                 <div id="schedule-setup" class="flex flex-col items-center justify-center py-10 text-center">
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
@@ -445,7 +432,6 @@ KAPARSH_FRONTEND = r"""
                             <i class="fa-solid fa-image text-xl text-famneon"></i>
                         </div>
                         <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus (PDF/Img)</p>
-                        <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Extracts locally on your device.</p>
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
@@ -456,7 +442,7 @@ KAPARSH_FRONTEND = r"""
                     <p class="text-xs text-neutral-500 mt-4 px-4 font-medium">(Or leave empty to build a Schedule based strictly on your extracted Chapter Topics)</p>
                 </div>
                 
-                <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent"></div>
+                <div id="schedule-result" class="hidden flex-col gap-4 relative"></div>
             </div>
 
             <!-- Tab: Quiz -->
@@ -525,10 +511,6 @@ KAPARSH_FRONTEND = r"""
     </div>
 
     <script>
-        // Setup PDF.js Global Worker
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
         const AppState = {
             extractedText: "",
             topics: null,
@@ -551,7 +533,6 @@ KAPARSH_FRONTEND = r"""
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
                 fileNameDisplay.classList.add('text-famneon');
-                fileNameDisplay.classList.remove('text-neutral-500');
             }
         });
         
@@ -587,8 +568,10 @@ KAPARSH_FRONTEND = r"""
             });
         });
 
-        const toggleLoader = (show, text = 'Processing...') => {
-            document.getElementById('loader-text').innerText = text;
+        const toggleLoader = (show, title = 'Processing Document...', text = 'Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)') => {
+            document.getElementById('loader-title').innerText = title;
+            document.getElementById('loader-text').innerHTML = text;
+            
             if (show) {
                 tabPanes.forEach(pane => pane.classList.add('hidden'));
                 document.getElementById('global-loader').classList.remove('hidden');
@@ -610,50 +593,18 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            let response;
-            let fullText = "";
+            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via server...<br>(This ensures your mobile browser doesn\'t crash)');
 
             try {
-                if (AppState.file.type === "application/pdf" || AppState.file.name.toLowerCase().endsWith(".pdf")) {
-                    toggleLoader(true, 'Extracting textbook locally...');
-                    
-                    const arrayBuffer = await AppState.file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    const maxPages = Math.min(pdf.numPages, 25);
-                    
-                    for (let i = 1; i <= maxPages; i++) {
-                        document.getElementById('loader-text').innerText = `Reading page ${i} of ${maxPages}...`;
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        const strings = content.items.map(item => item.str);
-                        fullText += strings.join(" ") + "\n";
-                        
-                        // THE UI UN-BLOCKER: Yields 30ms to the browser so the screen doesn't freeze or go blank
-                        await new Promise(resolve => setTimeout(resolve, 30));
-                    }
-                    
-                    if (!fullText.trim()) throw new Error("Could not read text from this PDF. It might be scanned/image-only.");
-                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
-                    
-                    toggleLoader(true, 'Synthesizing knowledge vectors...');
-                    response = await fetch('/api/analyze', { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: fullText }) 
-                    });
-
-                } else {
-                    toggleLoader(true, 'Performing server-side OCR on image...');
-                    const formData = new FormData();
-                    formData.append('file', AppState.file);
-                    response = await fetch('/api/analyze', { method: 'POST', body: formData });
-                }
-
+                const formData = new FormData();
+                formData.append('file', AppState.file);
+                
+                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
                 const rawText = await response.text();
                 
                 if (!response.ok) {
-                    let errMsg = "Server Error";
-                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed."; }
+                    let errMsg = "Network request failed. Your file might be too large.";
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
                 
@@ -784,45 +735,19 @@ KAPARSH_FRONTEND = r"""
                 return alert("Please set your Exam Date on the Home tab first.");
             }
 
-            toggleLoader(true, 'Analyzing syllabus...');
+            toggleLoader(true, 'Building Master Plan...', 'Reading syllabus and mapping out daily goals.<br>(This is a heavy AI task, please wait ~20 seconds)');
 
             try {
                 let response;
                 
                 if (AppState.syllabusFile) {
-                    if (AppState.syllabusFile.type === "application/pdf" || AppState.syllabusFile.name.toLowerCase().endsWith(".pdf")) {
-                        const arrayBuffer = await AppState.syllabusFile.arrayBuffer();
-                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                        let fullText = "";
-                        
-                        const maxPages = Math.min(pdf.numPages, 15);
-                        for (let i = 1; i <= maxPages; i++) {
-                            document.getElementById('loader-text').innerText = `Reading syllabus page ${i} of ${maxPages}...`;
-                            const page = await pdf.getPage(i);
-                            const content = await page.getTextContent();
-                            fullText += content.items.map(item => item.str).join(" ") + "\n";
-                            
-                            // THE UI UN-BLOCKER
-                            await new Promise(resolve => setTimeout(resolve, 30));
-                        }
-                        
-                        if (!fullText.trim()) throw new Error("Could not extract text. Document might be scanned.");
-                        if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
-
-                        document.getElementById('loader-text').innerText = 'Building master plan...';
-                        response = await fetch('/api/schedule', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ syllabus_text: fullText, exam_date: examDate, study_hours: parseFloat(studyHours) })
-                        });
-                    } else {
-                        const formData = new FormData();
-                        formData.append('file', AppState.syllabusFile);
-                        formData.append('exam_date', examDate);
-                        formData.append('study_hours', studyHours);
-                        response = await fetch('/api/schedule', { method: 'POST', body: formData });
-                    }
-                } else if (AppState.topics && AppState.topics.length > 0) {
+                    const formData = new FormData();
+                    formData.append('file', AppState.syllabusFile);
+                    formData.append('exam_date', examDate);
+                    formData.append('study_hours', studyHours);
+                    response = await fetch('/api/schedule', { method: 'POST', body: formData });
+                } 
+                else if (AppState.topics && AppState.topics.length > 0) {
                     const loadedTopics = AppState.topics.filter(t => t.loaded);
                     response = await fetch('/api/schedule', {
                         method: 'POST',
@@ -835,7 +760,7 @@ KAPARSH_FRONTEND = r"""
 
                 const rawText = await response.text();
                 if (!response.ok) {
-                    let errMsg = "Schedule request failed";
+                    let errMsg = "Schedule request failed. Connection dropped or file too large.";
                     try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
@@ -847,37 +772,43 @@ KAPARSH_FRONTEND = r"""
                 document.getElementById('schedule-result').classList.remove('hidden');
                 document.getElementById('schedule-result').classList.add('flex');
                 toggleLoader(false);
-            } catch (err) { showError(err.message || "Failed to fetch schedule."); }
+            } catch (err) { showError(err.message); }
         }
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
+            
             if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
-                return showError("Invalid schedule data received.");
+                return showError("AI failed to format the schedule correctly. Please try again.");
             }
             
             container.innerHTML = AppState.schedule.map((day) => `
-                <div class="bg-card p-5 rounded-2xl border border-borderline">
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
-                        <span class="text-neutral-500 text-[10px] font-bold">${day.total_hours_today || 0}h</span>
+                <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-card text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                        <span class="text-xs font-bold">${day.day || '-'}</span>
                     </div>
-                    <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Day'}</h4>
-                    <div class="flex flex-col gap-2 mb-4">
-                        ${(day.topics || []).map(t => `
-                            <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
-                                <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
-                                <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
-                            </div>
-                        `).join('')}
+                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline z-10">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
+                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today || 0}h</span>
+                        </div>
+                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Block'}</h4>
+                        <div class="flex flex-col gap-2 mb-4">
+                            ${(day.topics || []).map(t => `
+                                <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
+                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
+                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
                     </div>
-                    <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
                 </div>
             `).join('');
         }
 
         async function generateQuiz() {
-            toggleLoader(true, 'Generating questions...');
+            toggleLoader(true, 'Generating Exam...', 'Building difficult multiple-choice questions based on your material.');
             const loadedTopics = AppState.topics.filter(t => t.loaded);
 
             try {
@@ -891,6 +822,9 @@ KAPARSH_FRONTEND = r"""
                 if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Quiz Generation Failed");
                 
                 AppState.quiz = JSON.parse(rawText).quiz;
+                
+                if (!AppState.quiz || !Array.isArray(AppState.quiz)) throw new Error("AI output was invalid.");
+                
                 renderQuiz();
                 
                 document.getElementById('quiz-setup').classList.add('hidden');
@@ -907,7 +841,7 @@ KAPARSH_FRONTEND = r"""
             container.innerHTML = AppState.quiz.map((q, index) => `
                 <div id="qcard-${index}" class="bg-card p-6 rounded-3xl border border-borderline">
                     <p class="text-blurple font-bold text-xs mb-2">QUESTION ${index + 1}</p>
-                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question}</h4>
+                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question || 'Missing question'}</h4>
                     <div class="space-y-3">
                         ${(q.options || []).map(opt => `
                             <label class="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-borderline bg-dark active:bg-neutral-900 transition-colors">
@@ -941,13 +875,16 @@ KAPARSH_FRONTEND = r"""
                             <p class="text-xs text-famneon/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
                     card.classList.add('border-famneon/50');
+                    card.classList.remove('border-borderline');
                 } else {
                     resultDiv.innerHTML = `
                         <div class="p-4 bg-danger/10 border border-danger/30 rounded-2xl mt-4">
                             <p class="text-danger font-bold text-sm mb-2">Incorrect</p>
+                            <p class="text-xs mb-3 text-white">Correct: <span class="font-bold text-danger">${q.correct_answer}</span></p>
                             <p class="text-xs text-danger/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
                     card.classList.add('border-danger/50');
+                    card.classList.remove('border-borderline');
                 }
             });
             
