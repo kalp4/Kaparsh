@@ -86,13 +86,16 @@ def get_topic_details():
         prompt = (
             f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{data.get('topic')}'.\n"
             "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. BE HIGHLY CONCISE. Do not use filler words.\n"
+            "2. ABSOLUTELY NO REPETITION. Never repeat the same meaning, definition, or point twice across any category.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
-            '  "definitions": [{"term": "Exact Term", "definition": "Clear definition"}], (Leave empty [] if none exist)\n'
+            '  "definitions": [{"term": "Exact Term", "definition": "Clear, concise definition without repeating"}], (Leave empty [] if none exist)\n'
             '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist)\n'
-            '  "derivations": [{"title": "Derivation Name", "content": "The mathematical or logical steps"}], (Leave empty [] if none exist)\n'
-            '  "notes": ["Detailed point 1", "Detailed point 2"] (General bullet points)\n'
+            '  "derivations": [{"title": "Derivation Name", "content": "Concise mathematical or logical steps"}], (Leave empty [] if none exist)\n'
+            '  "notes": ["Concise point 1", "Concise point 2"] (General bullet points, strictly no repetition)\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"
         )
@@ -225,6 +228,10 @@ KAPARSH_FRONTEND = """
     <title>Kaparsh</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Handwritten text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -240,6 +247,7 @@ KAPARSH_FRONTEND = """
                     },
                     fontFamily: {
                         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                        handwritten: ['Kalam', 'cursive'],
                     }
                 }
             }
@@ -254,7 +262,24 @@ KAPARSH_FRONTEND = """
             background-color: #000;
             color: #fff;
             -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none; /* Safari */
+            user-select: none; /* Standard */
         }
+        
+        /* Eliminate the default blue highlight globally */
+        ::selection {
+            background: transparent;
+        }
+        ::-moz-selection {
+            background: transparent;
+        }
+        
+        /* Allow text selection ONLY inside input fields */
+        input {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
         ::-webkit-scrollbar { display: none; }
         
         .loader {
@@ -319,7 +344,6 @@ KAPARSH_FRONTEND = """
                     </div>
                 </div>
 
-                <!-- Fix: application/pdf eliminates OS lag -->
                 <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors">
                     <div class="w-14 h-14 bg-dark rounded-full flex items-center justify-center mb-3">
                         <i class="fa-solid fa-plus text-xl text-blurple"></i>
@@ -387,20 +411,18 @@ KAPARSH_FRONTEND = """
                 </div>
             </div>
 
-            <!-- Tab: Doubts (New Chat Feature) -->
+            <!-- Tab: Doubts -->
             <div id="tab-doubts" class="tab-pane hidden px-4 py-6 h-full flex flex-col">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-xl font-bold">Doubts</h2>
                 </div>
                 
-                <!-- Chat history area -->
                 <div id="chat-history" class="flex-1 overflow-y-auto flex flex-col gap-4 pb-10">
                     <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start shadow-sm">
                         <p class="text-sm text-neutral-200">Hi! I've read your document. Ask me anything about the topics inside, and I'll clear your doubts.</p>
                     </div>
                 </div>
                 
-                <!-- Input area -->
                 <div class="fixed bottom-[88px] left-0 right-0 mx-auto w-full max-w-md px-4 z-40">
                     <div class="bg-card border border-borderline rounded-full flex items-center p-1 shadow-lg shadow-black">
                         <input type="text" id="doubt-input" placeholder="Ask a question..." class="flex-1 bg-transparent text-white text-sm px-4 outline-none placeholder-neutral-500">
@@ -580,11 +602,11 @@ KAPARSH_FRONTEND = """
                 }
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div class="mt-4 space-y-3">
                         ${t.definitions.map(d => `
-                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl break-inside-avoid">
-                                <p class="text-sm text-neutral-300">
-                                    <strong class="text-blurple font-bold mr-1">${d.term}:</strong>${d.definition}
+                            <div class="bg-blurple/20 border-l-4 border-blurple p-4 rounded-r-2xl break-inside-avoid shadow-[0_0_15px_rgba(88,101,242,0.05)]">
+                                <p class="font-handwritten text-xl text-white leading-relaxed tracking-wide">
+                                    <strong class="text-blurple font-bold mr-2 drop-shadow-md">${d.term}:</strong>${d.definition}
                                 </p>
                             </div>
                         `).join('')}
@@ -592,41 +614,41 @@ KAPARSH_FRONTEND = """
                 ` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div class="mt-4 space-y-3">
                         ${t.formulas.map(f => `
-                            <div class="bg-famneon/10 border border-famneon/30 p-4 rounded-2xl flex flex-col items-center break-inside-avoid">
-                                <p class="font-mono text-lg font-bold text-famneon tracking-wider">${f.equation}</p>
-                                <p class="text-[10px] text-famneon/70 uppercase tracking-widest font-bold mt-1">${f.meaning}</p>
+                            <div class="bg-famneon/10 border-2 border-famneon/40 p-5 rounded-2xl flex flex-col items-center break-inside-avoid shadow-[0_0_15px_rgba(0,255,163,0.1)]">
+                                <p class="font-mono text-2xl font-bold text-famneon tracking-wider drop-shadow-md">${f.equation}</p>
+                                <p class="font-handwritten text-lg text-white font-bold mt-2 tracking-wide">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div class="mt-4 space-y-3">
                         ${t.derivations.map(d => `
-                            <div class="bg-card border border-xblue/30 p-4 rounded-2xl break-inside-avoid">
-                                <p class="text-xs font-bold text-xblue uppercase tracking-wider mb-2">${d.title}</p>
-                                <p class="text-xs text-neutral-300 font-mono leading-relaxed whitespace-pre-wrap">${d.content}</p>
+                            <div class="bg-card border-2 border-xblue/50 p-5 rounded-2xl break-inside-avoid shadow-[0_0_15px_rgba(29,161,242,0.1)]">
+                                <p class="font-handwritten text-xl font-bold text-xblue mb-2 drop-shadow-md">${d.title}</p>
+                                <p class="font-mono text-base text-white leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-300"><span class="text-neutral-600 mr-2">•</span>${n}</li>`).join('');
+                const notesList = t.notes.map(n => `<li class="mb-3 flex items-start font-handwritten text-xl text-white leading-relaxed tracking-wide"><span class="text-famneon mr-3 mt-1 text-sm"><i class="fa-solid fa-pen"></i></span>${n}</li>`).join('');
 
                 return `
-                <div class="bg-card p-5 rounded-3xl border border-borderline break-inside-avoid">
-                    <div class="flex justify-between items-start mb-3">
-                        <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest">${t.priority}</span>
+                <div class="bg-card p-6 rounded-3xl border border-borderline break-inside-avoid shadow-lg">
+                    <div class="flex justify-between items-start mb-4">
+                        <h4 class="font-bold text-xl text-white leading-tight pr-3">${t.title}</h4>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority}</span>
                     </div>
                     
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
                     
-                    <ul class="mt-4">
+                    <ul class="mt-5 space-y-1">
                         ${notesList}
                     </ul>
                 </div>
@@ -791,7 +813,6 @@ KAPARSH_FRONTEND = """
             }
         }
 
-        // Doubts Chat Feature
         document.getElementById('doubt-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') sendDoubt();
         });
@@ -804,7 +825,6 @@ KAPARSH_FRONTEND = """
 
             const chatHistory = document.getElementById('chat-history');
             
-            // Add user bubble
             chatHistory.innerHTML += `
                 <div class="bg-blurple text-white p-4 rounded-2xl rounded-tr-sm max-w-[85%] self-end shadow-md">
                     <p class="text-sm">${question}</p>
@@ -813,7 +833,6 @@ KAPARSH_FRONTEND = """
             input.value = '';
             window.scrollTo(0, document.body.scrollHeight);
 
-            // Add loading bubble
             const loaderId = 'loader-' + Date.now();
             chatHistory.innerHTML += `
                 <div id="${loaderId}" class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start flex items-center gap-1.5 shadow-sm">
