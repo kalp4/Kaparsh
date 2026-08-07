@@ -111,10 +111,10 @@ def get_topic_details():
             f"You are an expert tutor. Using the provided text, extract detailed study materials EXCLUSIVELY for the specific topic: '{topic_name}'.\n"
             f"{ignore_prompt}"
             "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
-            "CRITICAL ANTI-REPETITION INSTRUCTIONS (STRICTLY ENFORCED):\n"
-            "1. MUTUALLY EXCLUSIVE: If a fact, definition, or concept is placed in 'definitions', it MUST NOT be repeated in 'notes' or 'formulas'. Every single piece of information must appear exactly ONCE in the entire JSON.\n"
-            "2. NO DUPLICATE MEANINGS: Do not provide two definitions or notes that mean the exact same thing.\n"
-            "3. BE HIGHLY CONCISE: Do not use filler words. Extract only core facts.\n"
+            "CRITICAL ANTI-REPETITION INSTRUCTIONS:\n"
+            "1. Focus ONLY on the unique nuances of this specific topic. Do not summarize the whole chapter.\n"
+            "2. MUTUALLY EXCLUSIVE: If a fact is a 'definition', do not repeat it in 'notes'. Every piece of info must appear exactly ONCE.\n"
+            "3. BE HIGHLY CONCISE: Strip out filler words.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
@@ -365,7 +365,6 @@ KAPARSH_FRONTEND = """
                     </div>
                 </div>
 
-                <!-- Fix: Changed to a <label> to bypass iOS Webview security blocks -->
                 <label id="drop-zone" for="file-upload" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative block overflow-hidden">
                     <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
                         <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
@@ -917,3 +916,4 @@ def serve_frontend():
     response = make_response(KAPARSH_FRONTEND)
     response.headers["Content-Type"] = "text/html"
     return response
+    
