@@ -85,11 +85,14 @@ def get_topic_details():
         
         prompt = (
             f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{data.get('topic')}'.\n"
+            "Categorize the information strictly into definitions, formulas, derivations, and general notes.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
-            '  "notes": ["Detailed point 1", "Detailed point 2", "Detailed point 3"],\n'
-            '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist in the text for this topic)\n'
+            '  "definitions": [{"term": "Exact Term", "definition": "Clear definition"}], (Leave empty [] if none exist)\n'
+            '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist)\n'
+            '  "derivations": [{"title": "Derivation Name", "content": "The mathematical or logical steps"}], (Leave empty [] if none exist)\n'
+            '  "notes": ["Detailed point 1", "Detailed point 2"], (General bullet points)\n'
             '  "analogy": "A simple, highly effective real-world analogy explaining this concept to a beginner."\n'
             "}\n\n"
             f"Text:\n{data.get('text')}"

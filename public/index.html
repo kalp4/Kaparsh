@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduCoPilot — AI Study & Revision Agent</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2pdf for Native Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body {
             background-color: #fafafa;
@@ -52,7 +56,7 @@
     <main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         <!-- Sidebar -->
-        <aside class="lg:col-span-4 flex flex-col gap-6">
+        <aside class="lg:col-span-4 flex flex-col gap-6" data-html2canvas-ignore>
             <div class="bg-white border border-neutral-200 p-6 shadow-sm">
                 <h2 class="text-sm font-semibold mb-6 text-neutral-900 uppercase tracking-wide">Document Setup</h2>
                 
@@ -90,7 +94,7 @@
             <div class="bg-white border border-neutral-200 min-h-[600px] flex flex-col shadow-sm">
                 
                 <!-- Tabs -->
-                <div class="flex border-b border-neutral-200 bg-neutral-50/50">
+                <div class="flex border-b border-neutral-200 bg-neutral-50/50" data-html2canvas-ignore>
                     <button class="tab-btn flex-1 py-3 text-sm text-neutral-500 hover:text-neutral-900 transition-colors tab-active" data-target="tab-summary">
                         Extracted Notes
                     </button>
@@ -123,8 +127,15 @@
                     <!-- Notes Tab -->
                     <div id="tab-summary" class="tab-pane block">
                         <div class="flex justify-between items-center mb-8 pb-4 border-b border-neutral-100">
-                            <h2 class="text-xl font-semibold text-neutral-900">Study Notes</h2>
-                            <span id="topic-count" class="text-xs font-medium text-neutral-500 bg-neutral-100 px-2 py-1 rounded"></span>
+                            <div class="flex items-center gap-4">
+                                <h2 class="text-xl font-semibold text-neutral-900">Study Notes</h2>
+                                <span id="topic-count" class="text-xs font-medium text-neutral-500 bg-neutral-100 px-2 py-1 rounded"></span>
+                            </div>
+                            
+                            <!-- Save as PDF Button -->
+                            <button id="download-btn" onclick="downloadNotes()" class="hidden px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-medium transition-colors rounded shadow flex items-center gap-2" data-html2canvas-ignore>
+                                <i class="fa-solid fa-download"></i> Save as PDF
+                            </button>
                         </div>
                         <div id="topics-grid" class="flex flex-col gap-6">
                             <!-- Injected by JS -->
@@ -314,6 +325,12 @@
             const grid = document.getElementById('topics-grid');
             document.getElementById('topic-count').innerText = `${AppState.topics.length} Topics`;
             
+            // Show Download Button if at least one topic is loaded
+            const downloadBtn = document.getElementById('download-btn');
+            if (AppState.topics.some(t => t.loaded)) {
+                downloadBtn.classList.remove('hidden');
+            }
+            
             grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
@@ -337,31 +354,58 @@
                 };
                 const pStyle = priorityStyles[t.priority] || priorityStyles['Medium'];
                 
-                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-700 leading-relaxed"><span class="text-neutral-300 mr-2">—</span>${n}</li>`).join('');
-
-                const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
+                // Color-Coded Definitions
+                const defsHtml = (t.definitions && t.definitions.length > 0) ? `
                     <div class="my-4 space-y-2">
+                        ${t.definitions.map(d => `
+                            <p class="text-sm text-neutral-700 leading-relaxed">
+                                <strong class="text-blue-600 font-semibold mr-1">${d.term}:</strong> ${d.definition}
+                            </p>
+                        `).join('')}
+                    </div>
+                ` : '';
+
+                // High-Contrast Formulas
+                const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
+                    <div class="my-5 space-y-3">
                         ${t.formulas.map(f => `
-                            <div class="bg-neutral-50 border border-neutral-200 p-3 flex flex-col gap-1">
-                                <p class="font-mono text-sm font-medium text-neutral-900">${f.equation}</p>
-                                <p class="text-[11px] text-neutral-500 uppercase tracking-wider">${f.meaning}</p>
+                            <div class="bg-amber-50 border-2 border-amber-300 p-4 rounded-lg flex flex-col gap-1 shadow-sm break-inside-avoid">
+                                <p class="font-mono text-lg font-bold text-amber-900 text-center">${f.equation}</p>
+                                <p class="text-xs text-amber-700 uppercase tracking-wider text-center font-bold mt-1">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
+                // Differentiated Derivations
+                const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
+                    <div class="my-5 space-y-3">
+                        ${t.derivations.map(d => `
+                            <div class="bg-purple-50 border-l-4 border-purple-500 p-4 shadow-sm break-inside-avoid">
+                                <p class="text-sm font-bold text-purple-900 mb-2">${d.title}</p>
+                                <p class="text-sm text-purple-800 font-mono leading-relaxed whitespace-pre-wrap">${d.content}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '';
+
+                // General Notes
+                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-700 leading-relaxed"><span class="text-neutral-300 mr-2">—</span>${n}</li>`).join('');
+
                 return `
-                <div class="border border-neutral-200 p-6 hover:border-neutral-300 transition-colors">
+                <div class="border border-neutral-200 p-6 hover:border-neutral-300 transition-colors break-inside-avoid">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="font-semibold text-lg text-neutral-900 pr-4">${t.title}</h4>
                         <span class="text-[10px] font-medium px-2 py-0.5 border uppercase tracking-wider ${pStyle}">${t.priority}</span>
                     </div>
                     
-                    <ul class="mb-4">
+                    ${defsHtml}
+                    ${formulasHtml}
+                    ${derivationsHtml}
+                    
+                    <ul class="mb-4 mt-4">
                         ${notesList}
                     </ul>
-                    
-                    ${formulasHtml}
                     
                     <div class="mt-4 pt-4 border-t border-neutral-100">
                         <div class="border-l-2 border-neutral-900 pl-4 py-1">
@@ -371,6 +415,21 @@
                     </div>
                 </div>
             `}).join('');
+        }
+
+        // PDF Download Script
+        function downloadNotes() {
+            const element = document.getElementById('tab-summary');
+            const opt = {
+                margin:       0.5,
+                filename:     'EduCoPilot_Notes.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            
+            // html2pdf automatically ignores elements with the "data-html2canvas-ignore" attribute (like the download button itself)
+            html2pdf().set(opt).from(element).save();
         }
 
         async function generateSchedule() {
