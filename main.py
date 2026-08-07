@@ -27,18 +27,29 @@ def health_check():
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze_pdf():
-    try:
-        text = ""
-        client = get_gemini_client()
+    if 'file' not in request.files:
+        return jsonify({"detail": "No file uploaded."}), 400
         
-        # Route 1: Image Upload (Direct OCR via Gemini)
-        if 'file' in request.files:
-            file = request.files['file']
-            filename = file.filename.lower()
-            
-            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
-                
+    file = request.files['file']
+    filename = file.filename.lower()
+    
+    if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+        return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
+        
+    try:
+        client = get_gemini_client()
+        text = ""
+        
+        # Safe Server-Side PDF Extraction
+        if filename.endswith(".pdf"):
+            reader = PdfReader(file)
+            for page in reader.pages[:25]:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+                    
+        # Safe Server-Side Image Extraction (Gemini OCR)
+        else:
             image_bytes = file.read()
             mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
             image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
@@ -51,16 +62,9 @@ def analyze_pdf():
                 ]
             )
             text = transcription_response.text
-            
-        # Route 2: Pre-Extracted Text from Frontend (Bypasses Vercel 4.5MB Payload Limit)
-        elif request.is_json and 'text' in request.json:
-            text = request.json['text']
-            
-        else:
-            return jsonify({"detail": "No valid file or text payload provided."}), 400
-            
-        if not text or not text.strip():
-            return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
+                
+        if not text.strip():
+            return jsonify({"detail": "Could not extract text from the provided file."}), 400
             
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
@@ -138,69 +142,104 @@ def get_topic_details():
 def generate_schedule():
     try:
         client = get_gemini_client()
-        text = ""
         exam_date = ""
         study_hours = 2
+        text = ""
+        topics_json = "[]"
+        is_macro = False
         
-        # Route 1: Image Upload (Direct OCR via Gemini)
+        # Route 1: Uploaded a Master Syllabus File (PDF or Image)
         if 'file' in request.files:
+            is_macro = True
             file = request.files['file']
             exam_date = request.form.get('exam_date')
             study_hours = request.form.get('study_hours', 2)
             
             filename = file.filename.lower()
-            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+            
+            if filename.endswith(".pdf"):
+                reader = PdfReader(file)
+                for page in reader.pages[:15]:  # Safe limit to avoid memory overflow
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+            elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                image_bytes = file.read()
+                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
                 
-            image_bytes = file.read()
-            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-            
-            transcription_response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=[
-                    "Transcribe all readable text in this syllabus image perfectly. Return only raw text.", 
-                    image_part
-                ]
-            )
-            text = transcription_response.text
-            
-        # Route 2: Pre-Extracted Text from Frontend
-        elif request.is_json and 'syllabus_text' in request.json:
+                transcription_response = client.models.generate_content(
+                    model='gemini-3.5-flash-lite',
+                    contents=["Transcribe all readable text in this syllabus image perfectly. Return only raw text.", image_part]
+                )
+                text = transcription_response.text
+            else:
+                return jsonify({"detail": "Unsupported file format."}), 400
+                
+            if not text.strip():
+                return jsonify({"detail": "Could not extract text from the syllabus."}), 400
+                
+        # Route 2: Generated Schedule via Extracted Chapter Topics
+        elif request.is_json and 'topics' in request.json:
             data = request.json
-            text = data.get('syllabus_text', '')
+            topics_json = json.dumps(data.get('topics', []))
             exam_date = data.get('exam_date')
             study_hours = data.get('study_hours', 2)
+        else:
+            return jsonify({"detail": "No valid data provided to build schedule."}), 400
+
+        # Dynamic AI Prompt Logic
+        if is_macro:
+            prompt = (
+                f"You are a Master Study Planner. The student has provided their complete course/exam syllabus below.\n"
+                f"Target Exam Date: {exam_date}\n"
+                f"Daily Study Hours Available: {study_hours}\n\n"
+                f"Syllabus Content:\n{text[:30000]}\n\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "1. Identify all core subjects and sub-topics from the syllabus.\n"
+                "2. Map them out into a highly realistic daily study schedule starting from Day 1 up to the Exam Date.\n"
+                "3. Allocate estimated minutes per topic. Do not exceed the daily available hours.\n"
+                "4. Mix different subjects on the same day if possible to optimize learning and prevent burnout.\n"
+                "5. Integrate Spaced Repetition (allocate specific days strictly for review of earlier topics).\n"
+                "Return ONLY a JSON object with this exact structure:\n"
+                "{\n"
+                '  "schedule": [\n'
+                '    {\n'
+                '      "day": 1, \n'
+                '      "date": "YYYY-MM-DD", \n'
+                '      "focus_area": "Subject Name - Broad Concept",\n'
+                '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
+                '      "total_hours_today": 2.5, \n'
+                '      "actionable_advice": "Specific study technique to use today"\n'
+                '    }\n'
+                "  ]\n"
+                "}"
+            )
+        else:
+            prompt = (
+                f"You are a highly efficient study planner utilizing Spaced Repetition.\n"
+                f"Exam Date: {exam_date}\n"
+                f"Daily Hours Available: {study_hours}\n"
+                f"Topics to map out: {topics_json}\n\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "1. DO NOT assign a flat default 2 hours per topic. Estimate realistic minutes for each topic (e.g., 15 mins for easy topics, 45 mins for complex ones).\n"
+                "2. Group multiple topics into a single day so the student can finish the syllabus early.\n"
+                "3. Optimize the schedule efficiently within the available daily hours.\n"
+                "Return ONLY a JSON object with this exact structure:\n"
+                "{\n"
+                '  "schedule": [\n'
+                '    {\n'
+                '      "day": 1, \n'
+                '      "date": "YYYY-MM-DD", \n'
+                '      "focus_area": "Initial Learning vs Active Recall",\n'
+                '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}, {"name": "Topic 2", "estimated_minutes": 15}], \n'
+                '      "total_hours_today": 0.75, \n'
+                '      "actionable_advice": "Specific study technique to use today"\n'
+                '    }\n'
+                "  ]\n"
+                "}"
+            )
             
-        if not text or not text.strip():
-            return jsonify({"detail": "Could not extract syllabus text. Please try a clearer document."}), 400
-            
-        prompt = (
-            f"You are a Master Study Planner. The student has provided their complete course/exam syllabus below.\n"
-            f"Target Exam Date: {exam_date}\n"
-            f"Daily Study Hours Available: {study_hours}\n\n"
-            f"Syllabus Content:\n{text[:30000]}\n\n"
-            "CRITICAL INSTRUCTIONS:\n"
-            "1. Identify all core subjects and sub-topics from the syllabus.\n"
-            "2. Map them out into a highly realistic daily study schedule starting from Day 1 up to the Exam Date.\n"
-            "3. Allocate estimated minutes per topic. Do not exceed the daily available hours.\n"
-            "4. Mix different subjects on the same day if possible to optimize learning and prevent burnout.\n"
-            "5. Integrate Spaced Repetition (allocate specific days strictly for review of earlier topics).\n"
-            "Return ONLY a JSON object with this exact structure:\n"
-            "{\n"
-            '  "schedule": [\n'
-            '    {\n'
-            '      "day": 1, \n'
-            '      "date": "YYYY-MM-DD", \n'
-            '      "focus_area": "Subject Name - Broad Concept",\n'
-            '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
-            '      "total_hours_today": 2.5, \n'
-            '      "actionable_advice": "Specific study technique to use today"\n'
-            '    }\n'
-            "  ]\n"
-            "}"
-        )
-        
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
@@ -308,21 +347,18 @@ KAPARSH_FRONTEND = r"""
     </script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf & pdf.js -->
+    <!-- html2pdf for Native Download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         body {
             background-color: #000;
             color: #fff;
             -webkit-tap-highlight-color: transparent;
-            -webkit-user-select: none; /* Safari */
-            user-select: none; /* Standard */
+            -webkit-user-select: none;
+            user-select: none;
         }
-        
         ::selection { background: transparent; }
         ::-moz-selection { background: transparent; }
-        
         input { -webkit-user-select: auto; user-select: auto; }
         ::-webkit-scrollbar { display: none; }
         
@@ -390,7 +426,7 @@ KAPARSH_FRONTEND = r"""
                         </div>
                     </div>
                     <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Chapter (PDF/Img)</p>
-                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Unlimited pages! Extracts instantly on-device.</p>
+                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Processed safely on our servers.</p>
                     <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                 </label>
 
@@ -435,6 +471,8 @@ KAPARSH_FRONTEND = r"""
                     <button onclick="generateSchedule()" class="w-full max-w-sm bg-blurple text-white font-bold py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(88,101,242,0.3)]">
                         Build Master Plan
                     </button>
+                    
+                    <p class="text-xs text-neutral-500 mt-4 px-4 font-medium">(Or leave empty to build a Schedule based strictly on your extracted Chapter Topics)</p>
                 </div>
                 
                 <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
@@ -514,10 +552,6 @@ KAPARSH_FRONTEND = r"""
     </div>
 
     <script>
-        // Setup PDF.js Global Worker
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
         const AppState = {
             extractedText: "",
             topics: null,
@@ -599,49 +633,18 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            let response;
-            let fullText = "";
+            toggleLoader(true, 'Extracting document on secure server...');
 
             try {
-                if (AppState.file.type === "application/pdf" || AppState.file.name.toLowerCase().endsWith(".pdf")) {
-                    toggleLoader(true, 'Extracting textbook instantly on device...');
-                    
-                    const arrayBuffer = await AppState.file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    
-                    // PREVENT OOM CRASH ON MOBILE: Cap to 25 pages max for chapters
-                    const maxPages = Math.min(pdf.numPages, 25);
-                    for (let i = 1; i <= maxPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        const strings = content.items.map(item => item.str);
-                        fullText += strings.join(" ") + "\n";
-                    }
-                    
-                    if (!fullText.trim()) throw new Error("Could not read text from this PDF. It might be scanned/image-only.");
-                    
-                    // Prevent massive payload blocks
-                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
-                    
-                    toggleLoader(true, 'Synthesizing knowledge vectors...');
-                    response = await fetch('/api/analyze', { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ text: fullText }) 
-                    });
-
-                } else {
-                    toggleLoader(true, 'Performing server-side OCR on image...');
-                    const formData = new FormData();
-                    formData.append('file', AppState.file);
-                    response = await fetch('/api/analyze', { method: 'POST', body: formData });
-                }
-
+                const formData = new FormData();
+                formData.append('file', AppState.file);
+                
+                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
                 const rawText = await response.text();
                 
                 if (!response.ok) {
                     let errMsg = "Server Error";
-                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed. If it is an image, it might be too large."; }
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
                 
@@ -779,7 +782,7 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
-        // Macro-Planner Logic (Syllabus)
+        // Macro-Planner Logic
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
@@ -788,48 +791,36 @@ KAPARSH_FRONTEND = r"""
                 switchTab('tab-home');
                 return alert("Please set your Exam Date on the Home tab first.");
             }
-            if (!AppState.syllabusFile) {
-                return alert("Please upload your Master Syllabus file first.");
-            }
 
             toggleLoader(true, 'Analyzing syllabus & building master plan...');
 
             try {
                 let response;
-                if (AppState.syllabusFile.type === "application/pdf" || AppState.syllabusFile.name.toLowerCase().endsWith(".pdf")) {
-                    const arrayBuffer = await AppState.syllabusFile.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    let fullText = "";
-                    
-                    // PREVENT OOM CRASH ON MOBILE: Cap syllabus parsing to 10 pages
-                    const maxPages = Math.min(pdf.numPages, 10);
-                    for (let i = 1; i <= maxPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const content = await page.getTextContent();
-                        fullText += content.items.map(item => item.str).join(" ") + "\n";
-                    }
-                    
-                    if (!fullText.trim()) throw new Error("Could not extract text. Document might be scanned.");
-                    
-                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
-
-                    response = await fetch('/api/schedule', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ syllabus_text: fullText, exam_date: examDate, study_hours: parseFloat(studyHours) })
-                    });
-                } else {
+                
+                // Case 1: Syllabus Upload (Macro Plan)
+                if (AppState.syllabusFile) {
                     const formData = new FormData();
                     formData.append('file', AppState.syllabusFile);
                     formData.append('exam_date', examDate);
                     formData.append('study_hours', studyHours);
                     response = await fetch('/api/schedule', { method: 'POST', body: formData });
+                } 
+                // Case 2: Chapter Topics Extracted (Micro Plan)
+                else if (AppState.topics && AppState.topics.length > 0) {
+                    const loadedTopics = AppState.topics.filter(t => t.loaded);
+                    response = await fetch('/api/schedule', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ topics: loadedTopics, exam_date: examDate, study_hours: parseFloat(studyHours) })
+                    });
+                } else {
+                    throw new Error("Please upload a Master Syllabus OR generate intelligence from a Chapter first.");
                 }
 
                 const rawText = await response.text();
                 if (!response.ok) {
                     let errMsg = "Server Error";
-                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed or Server Error."; }
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
                 
