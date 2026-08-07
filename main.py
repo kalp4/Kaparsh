@@ -27,29 +27,18 @@ def health_check():
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze_pdf():
-    if 'file' not in request.files:
-        return jsonify({"detail": "No file uploaded."}), 400
-        
-    file = request.files['file']
-    filename = file.filename.lower()
-    
-    if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-        return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
-        
     try:
-        client = get_gemini_client()
         text = ""
+        client = get_gemini_client()
         
-        # Handle PDF Extraction
-        if filename.endswith(".pdf"):
-            reader = PdfReader(file)
-            for page in reader.pages[:25]:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-                    
-        # Handle Image Extraction natively using Gemini
-        else:
+        # Route 1: Image Upload (Direct OCR via Gemini)
+        if 'file' in request.files:
+            file = request.files['file']
+            filename = file.filename.lower()
+            
+            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+                
             image_bytes = file.read()
             mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
             image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
@@ -62,9 +51,16 @@ def analyze_pdf():
                 ]
             )
             text = transcription_response.text
-                
-        if not text.strip():
-            return jsonify({"detail": "Could not extract text from the provided file."}), 400
+            
+        # Route 2: Pre-Extracted Text from Frontend (Bypasses Vercel 4.5MB Payload Limit)
+        elif request.is_json and 'text' in request.json:
+            text = request.json['text']
+            
+        else:
+            return jsonify({"detail": "No valid file or text payload provided."}), 400
+            
+        if not text or not text.strip():
+            return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
             
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
@@ -243,9 +239,10 @@ def answer_doubt():
 
 # ==============================================================================
 # MOBILE NATIVE UI INJECTION
+# Used a Python Raw String (r"") to prevent escaping bugs in the JS logic
 # ==============================================================================
 
-KAPARSH_FRONTEND = """
+KAPARSH_FRONTEND = r"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -276,8 +273,9 @@ KAPARSH_FRONTEND = """
     </script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf for Native Download -->
+    <!-- html2pdf & pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         body {
             background-color: #000;
@@ -375,7 +373,7 @@ KAPARSH_FRONTEND = """
                         </div>
                     </div>
                     <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Tap to upload PDF or Image</p>
-                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Max 25 pages (PDF) or 1 Image</p>
+                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Unlimited pages! Extracts instantly on-device.</p>
                     <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                 </label>
 
@@ -489,6 +487,10 @@ KAPARSH_FRONTEND = """
     </div>
 
     <script>
+        // Setup PDF.js Global Worker
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
         const AppState = {
             extractedText: "",
             topics: null,
@@ -555,17 +557,49 @@ KAPARSH_FRONTEND = """
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
-            toggleLoader(true, 'Analyzing file payload...');
             AppState.globalBannedTerms = []; 
-
-            const formData = new FormData();
-            formData.append('file', AppState.file);
+            let response;
+            let fullText = "";
 
             try {
-                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                // Determine Edge Extraction (PDF) vs Backend OCR (Image)
+                if (AppState.file.type === "application/pdf" || AppState.file.name.toLowerCase().endsWith(".pdf")) {
+                    toggleLoader(true, 'Extracting textbook instantly on device...');
+                    
+                    const arrayBuffer = await AppState.file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const maxPages = Math.min(pdf.numPages, 25);
+                    
+                    for (let i = 1; i <= maxPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        const strings = content.items.map(item => item.str);
+                        fullText += strings.join(" ") + "\n";
+                    }
+                    
+                    if (!fullText.trim()) throw new Error("Could not read text from this PDF. It might be scanned/image-only.");
+                    
+                    toggleLoader(true, 'Synthesizing knowledge vectors...');
+                    response = await fetch('/api/analyze', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: fullText }) 
+                    });
+
+                } else {
+                    toggleLoader(true, 'Performing server-side OCR on image...');
+                    const formData = new FormData();
+                    formData.append('file', AppState.file);
+                    response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                }
+
                 const rawText = await response.text();
                 
-                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
+                if (!response.ok) {
+                    let errMsg = "Server Error";
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed. If it is an image, it might be too large."; }
+                    throw new Error(errMsg);
+                }
                 
                 const data = JSON.parse(rawText);
                 AppState.extractedText = data.extracted_text;
@@ -916,4 +950,3 @@ def serve_frontend():
     response = make_response(KAPARSH_FRONTEND)
     response.headers["Content-Type"] = "text/html"
     return response
-    
