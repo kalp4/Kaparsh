@@ -228,10 +228,6 @@ KAPARSH_FRONTEND = """
     <title>Kaparsh</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts for Handwritten text -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -247,7 +243,6 @@ KAPARSH_FRONTEND = """
                     },
                     fontFamily: {
                         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-                        handwritten: ['Kalam', 'cursive'],
                     }
                 }
             }
@@ -304,7 +299,7 @@ KAPARSH_FRONTEND = """
         }
     </style>
 </head>
-<body class="antialiased overflow-x-hidden pb-36">
+<body class="antialiased overflow-x-hidden pb-36 font-sans">
 
     <div class="max-w-md mx-auto min-h-screen bg-dark relative border-x border-borderline shadow-2xl">
         
@@ -344,7 +339,7 @@ KAPARSH_FRONTEND = """
                     </div>
                 </div>
 
-                <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors">
+                <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer">
                     <div class="w-14 h-14 bg-dark rounded-full flex items-center justify-center mb-3">
                         <i class="fa-solid fa-plus text-xl text-blurple"></i>
                     </div>
@@ -366,7 +361,7 @@ KAPARSH_FRONTEND = """
                 </div>
                 
                 <!-- Single Unified Notebook Page Container -->
-                <div id="topics-grid" class="bg-card rounded-3xl border border-borderline p-6 flex flex-col gap-8 shadow-lg">
+                <div id="topics-grid" class="bg-card rounded-3xl border border-borderline p-6 flex flex-col gap-6 shadow-lg">
                     <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
                         <i class="fa-solid fa-book-open text-4xl mb-4 text-neutral-600"></i>
                         <p class="text-sm font-medium">Your digital notebook is empty.</p>
@@ -590,7 +585,7 @@ KAPARSH_FRONTEND = """
             grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
-                    <div class="opacity-50 animate-pulse border-b border-borderline pb-8 last:border-0 last:pb-0">
+                    <div class="border-b border-borderline pb-6 mb-6 last:border-0 last:mb-0 last:pb-0 opacity-50 animate-pulse">
                         <div class="flex justify-between items-center mb-3">
                             <h4 class="font-bold text-base w-2/3 h-5 bg-borderline rounded"></h4>
                             <div class="w-4 h-4 border-2 border-borderline border-t-white rounded-full animate-spin"></div>
@@ -603,11 +598,11 @@ KAPARSH_FRONTEND = """
                 }
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
-                    <div class="mt-4 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.definitions.map(d => `
-                            <div class="bg-blurple/20 border-l-4 border-blurple p-4 rounded-r-2xl break-inside-avoid shadow-[0_0_15px_rgba(88,101,242,0.05)]">
-                                <p class="font-handwritten text-xl text-white leading-relaxed tracking-wide">
-                                    <strong class="font-sans text-base text-blurple font-bold mr-2 drop-shadow-md">${d.term}:</strong>${d.definition}
+                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl break-inside-avoid shadow-[0_0_15px_rgba(88,101,242,0.05)]">
+                                <p class="text-sm text-neutral-200 leading-relaxed tracking-wide">
+                                    <strong class="text-blurple font-bold mr-2">${d.term}:</strong>${d.definition}
                                 </p>
                             </div>
                         `).join('')}
@@ -615,33 +610,33 @@ KAPARSH_FRONTEND = """
                 ` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div class="mt-4 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.formulas.map(f => `
-                            <div class="bg-famneon/10 border-2 border-famneon/40 p-5 rounded-2xl flex flex-col items-center break-inside-avoid shadow-[0_0_15px_rgba(0,255,163,0.1)]">
-                                <p class="font-mono text-2xl font-bold text-famneon tracking-wider drop-shadow-md">${f.equation}</p>
-                                <p class="font-handwritten text-lg text-white font-bold mt-2 tracking-wide">${f.meaning}</p>
+                            <div class="bg-famneon/5 border border-famneon/20 p-4 rounded-xl flex flex-col items-center break-inside-avoid shadow-[0_0_15px_rgba(0,255,163,0.05)]">
+                                <p class="font-mono text-lg font-bold text-famneon tracking-wider drop-shadow-md">${f.equation}</p>
+                                <p class="text-xs text-neutral-300 font-medium mt-1 tracking-wide">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
-                    <div class="mt-4 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.derivations.map(d => `
-                            <div class="bg-dark border-2 border-xblue/50 p-5 rounded-2xl break-inside-avoid shadow-[0_0_15px_rgba(29,161,242,0.1)]">
-                                <p class="font-handwritten text-xl font-bold text-xblue mb-2 drop-shadow-md">${d.title}</p>
-                                <p class="font-mono text-base text-white leading-relaxed whitespace-pre-wrap">${d.content}</p>
+                            <div class="bg-dark border border-xblue/30 p-4 rounded-xl break-inside-avoid shadow-[0_0_15px_rgba(29,161,242,0.05)]">
+                                <p class="text-sm font-bold text-xblue mb-1 drop-shadow-md">${d.title}</p>
+                                <p class="font-mono text-xs text-neutral-300 leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                const notesList = t.notes.map(n => `<li class="mb-3 flex items-start font-handwritten text-xl text-white leading-relaxed tracking-wide"><span class="text-famneon mr-3 mt-1 text-sm font-sans"><i class="fa-solid fa-pen"></i></span>${n}</li>`).join('');
+                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-200 leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
 
                 return `
-                <div class="border-b border-borderline pb-8 last:border-0 last:pb-0 break-inside-avoid">
-                    <div class="flex justify-between items-start mb-4">
-                        <h4 class="font-bold text-xl text-white leading-tight pr-3">${t.title}</h4>
+                <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0 break-inside-avoid">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
                         <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority}</span>
                     </div>
                     
@@ -649,7 +644,7 @@ KAPARSH_FRONTEND = """
                     ${formulasHtml}
                     ${derivationsHtml}
                     
-                    <ul class="mt-5 space-y-1">
+                    <ul class="mt-4 space-y-1">
                         ${notesList}
                     </ul>
                 </div>
