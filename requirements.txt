@@ -1,6 +1,5 @@
-fastapi
-python-multipart
+Flask
+Flask-Cors
 pypdf
 google-genai
-uvicorn
 python-dotenv

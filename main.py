@@ -2,60 +2,40 @@ import io
 import os
 import json
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pypdf import PdfReader
 from google import genai
 from google.genai import types
 
 load_dotenv()
 
-app = FastAPI(title="EduCoPilot API")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class TopicDetailRequest(BaseModel):
-    text: str
-    topic: str
-
-class ScheduleRequest(BaseModel):
-    topics: list
-    exam_date: str
-    study_hours: float
-
-class QuizRequest(BaseModel):
-    topics: list
+app = Flask(__name__)
+CORS(app)
 
 def get_gemini_client():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=500, detail="Server Configuration Error: GEMINI_API_KEY environment variable is missing.")
-    try:
-        return genai.Client(api_key=api_key)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to initialize Gemini Client: {str(e)}")
+        raise Exception("Server Configuration Error: GEMINI_API_KEY environment variable is missing.")
+    return genai.Client(api_key=api_key)
 
 
-@app.get("/api/health")
-async def health_check():
-    return {"status": "EduCoPilot Backend is Live and Ready!"}
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    return jsonify({"status": "EduCoPilot Flask Backend is Live and Ready!"})
 
 
-@app.post("/api/analyze")
-async def analyze_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+@app.route("/api/analyze", methods=["POST"])
+def analyze_pdf():
+    if 'file' not in request.files:
+        return jsonify({"detail": "No file uploaded."}), 400
+        
+    file = request.files['file']
+    if file.filename == '' or not file.filename.lower().endswith(".pdf"):
+        return jsonify({"detail": "Only PDF files are supported."}), 400
         
     try:
-        contents = await file.read()
-        reader = PdfReader(io.BytesIO(contents))
+        reader = PdfReader(file)
         text = ""
         
         for page in reader.pages[:25]:
@@ -64,7 +44,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
                 text += extracted + "\n"
                 
         if not text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract text.")
+            return jsonify({"detail": "Could not extract text."}), 400
             
         client = get_gemini_client()
         
@@ -79,7 +59,8 @@ async def analyze_pdf(file: UploadFile = File(...)):
             f"Text:\n{text[:30000]}"
         )
         
-        response = await client.aio.models.generate_content(
+        # Note: Flask uses standard synchronous calls, so we remove the .aio from the client
+        response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
@@ -87,22 +68,23 @@ async def analyze_pdf(file: UploadFile = File(...)):
         
         parsed_data = json.loads(response.text)
         
-        return {
+        return jsonify({
             "topics": parsed_data.get("topics", []),
             "extracted_text": text[:30000]
-        }
+        })
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF Analysis failed: {str(e)}")
+        return jsonify({"detail": f"PDF Analysis failed: {str(e)}"}), 500
 
 
-@app.post("/api/topic")
-async def get_topic_details(req: TopicDetailRequest):
+@app.route("/api/topic", methods=["POST"])
+def get_topic_details():
     try:
+        data = request.get_json()
         client = get_gemini_client()
         
         prompt = (
-            f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{req.topic}'.\n"
+            f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{data.get('topic')}'.\n"
             "Return ONLY a JSON object with this exact structure:\n"
             "{\n"
             '  "priority": "High",\n'
@@ -110,31 +92,32 @@ async def get_topic_details(req: TopicDetailRequest):
             '  "formulas": [{"equation": "E=mc^2", "meaning": "Mass-energy equivalence"}], (Leave empty [] if none exist in the text for this topic)\n'
             '  "flashcard": {"q": "Question?", "a": "Answer."}\n'
             "}\n\n"
-            f"Text:\n{req.text}"
+            f"Text:\n{data.get('text')}"
         )
         
-        response = await client.aio.models.generate_content(
+        response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
         )
         
-        return json.loads(response.text)
+        return jsonify(json.loads(response.text))
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Topic detailing failed: {str(e)}")
+        return jsonify({"detail": f"Topic detailing failed: {str(e)}"}), 500
 
 
-@app.post("/api/schedule")
-async def generate_schedule(req: ScheduleRequest):
+@app.route("/api/schedule", methods=["POST"])
+def generate_schedule():
     try:
+        data = request.get_json()
         client = get_gemini_client()
-        topics_json = json.dumps(req.topics)
+        topics_json = json.dumps(data.get('topics', []))
         
         prompt = (
             f"You are an expert study planner utilizing the Spaced Repetition algorithm. Create a schedule.\n"
-            f"Exam Date: {req.exam_date}\n"
-            f"Daily Hours: {req.study_hours}\n"
+            f"Exam Date: {data.get('exam_date')}\n"
+            f"Daily Hours: {data.get('study_hours')}\n"
             f"Topics to map out: {topics_json}\n\n"
             "Distribute them using the 'Learn, Recall, Master' spacing method. "
             "Return ONLY a JSON object with this exact structure:\n"
@@ -152,22 +135,23 @@ async def generate_schedule(req: ScheduleRequest):
             "}"
         )
         
-        response = await client.aio.models.generate_content(
+        response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.3)
         )
-        return json.loads(response.text)
+        return jsonify(json.loads(response.text))
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}")
+        return jsonify({"detail": f"Schedule generation failed: {str(e)}"}), 500
 
 
-@app.post("/api/quiz")
-async def generate_quiz(req: QuizRequest):
+@app.route("/api/quiz", methods=["POST"])
+def generate_quiz():
     try:
+        data = request.get_json()
         client = get_gemini_client()
-        topics_json = json.dumps(req.topics)
+        topics_json = json.dumps(data.get('topics', []))
         
         prompt = (
             "You are a strict examiner. Create a 5-question multiple-choice practice exam based on these topics.\n"
@@ -187,12 +171,14 @@ async def generate_quiz(req: QuizRequest):
             "}"
         )
         
-        response = await client.aio.models.generate_content(
+        response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.3)
         )
-        return json.loads(response.text)
+        return jsonify(json.loads(response.text))
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Quiz generation failed: {str(e)}")
+        return jsonify({"detail": f"Quiz generation failed: {str(e)}"}), 500
+
+# Do not run app.run() here; Vercel handles serving the 'app' object natively.
