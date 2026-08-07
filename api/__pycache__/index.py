@@ -4,7 +4,6 @@ import json
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pypdf import PdfReader
 from google import genai
@@ -54,7 +53,6 @@ async def analyze_pdf(file: UploadFile = File(...)):
         reader = PdfReader(io.BytesIO(contents))
         text = ""
         
-        # We can now safely process up to 25 pages without hitting Vercel limits!
         for page in reader.pages[:25]:
             extracted = page.extract_text()
             if extracted:
@@ -65,7 +63,7 @@ async def analyze_pdf(file: UploadFile = File(...)):
             
         client = get_gemini_client()
         
-        # PHASE 1: Only extract the Topic Names (Lightning Fast)
+        # PHASE 1: Extract the Topic Names
         prompt = (
             "You are an AI study assistant. Read the following text and identify the 4 to 6 most important core topics. "
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
@@ -85,7 +83,6 @@ async def analyze_pdf(file: UploadFile = File(...)):
         
         parsed_data = json.loads(response.text)
         
-        # We return the extracted text back to the frontend so it can be used for Phase 2
         return {
             "topics": parsed_data.get("topics", []),
             "extracted_text": text[:30000]
@@ -100,7 +97,7 @@ async def get_topic_details(req: TopicDetailRequest):
     try:
         client = get_gemini_client()
         
-        # PHASE 2: Micro-tasking specific topic details
+        # PHASE 2: Extract detailed notes and formulas for one specific topic
         prompt = (
             f"You are an expert tutor. Using the provided text, extract detailed study materials for the topic: '{req.topic}'.\n"
             "Return ONLY a JSON object with this exact structure:\n"
@@ -197,10 +194,4 @@ async def generate_quiz(req: QuizRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Quiz generation failed: {str(e)}")
 
-
-current_file_path = os.path.abspath(__file__)
-project_root = os.path.dirname(os.path.dirname(current_file_path))
-public_dir = os.path.join(project_root, "public")
-
-if os.path.exists(public_dir):
-    app.mount("/", StaticFiles(directory=public_dir, html=True), name="static")
+# Note: No app.mount() here anymore! Vercel handles the static files natively.
