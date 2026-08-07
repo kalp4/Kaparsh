@@ -38,16 +38,12 @@ def analyze_pdf():
             if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
                 return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
                 
-            # Safe Server-Side PDF Extraction
             if filename.endswith(".pdf"):
                 reader = PdfReader(file)
-                # Cap to 20 pages to prevent memory limits while getting enough context
                 for page in reader.pages[:20]:
                     extracted = page.extract_text()
                     if extracted:
                         text += extracted + "\n"
-                        
-            # Safe Server-Side Image OCR
             else:
                 image_bytes = file.read()
                 mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
@@ -97,6 +93,56 @@ def analyze_pdf():
         return jsonify({"detail": f"File Analysis failed: {str(e)}"}), 500
 
 
+@app.route("/api/parse-syllabus", methods=["POST"])
+def parse_syllabus():
+    try:
+        client = get_gemini_client()
+        text = ""
+        
+        if 'file' in request.files:
+            file = request.files['file']
+            filename = file.filename.lower()
+            
+            if filename.endswith(".pdf"):
+                reader = PdfReader(file)
+                for page in reader.pages[:15]:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted + "\n"
+            else:
+                image_bytes = file.read()
+                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                transcription_response = client.models.generate_content(
+                    model='gemini-3.5-flash-lite',
+                    contents=["Transcribe readable text from this syllabus image perfectly. Raw text only.", image_part]
+                )
+                text = transcription_response.text
+                
+        if not text.strip():
+            return jsonify({"detail": "Could not extract text from the syllabus."}), 400
+            
+        prompt = (
+            "Analyze the following syllabus text and extract a clean list of all distinct subjects found in it.\n"
+            "Return ONLY a JSON object with this exact structure:\n"
+            "{\n"
+            '  "subjects": ["Subject 1", "Subject 2", "Subject 3"],\n'
+            '  "full_text": "Full extracted text context"\n'
+            "}\n\n"
+            f"Text:\n{text[:30000]}"
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+        )
+        return jsonify(json.loads(response.text))
+        
+    except Exception as e:
+        return jsonify({"detail": f"Syllabus parsing failed: {str(e)}"}), 500
+
+
 @app.route("/api/topic", methods=["POST"])
 def get_topic_details():
     try:
@@ -141,80 +187,17 @@ def get_topic_details():
 @app.route("/api/schedule", methods=["POST"])
 def generate_schedule():
     try:
+        data = request.get_json()
         client = get_gemini_client()
-        exam_date = ""
-        study_hours = 2
-        text = ""
-        topics_json = "[]"
-        is_macro = False
         
-        # Route 1: Syllabus File Uploaded
-        if 'file' in request.files:
-            is_macro = True
-            file = request.files['file']
-            exam_date = request.form.get('exam_date', '')
-            study_hours = request.form.get('study_hours', 2)
-            
-            filename = file.filename.lower()
-            
-            if filename.endswith(".pdf"):
-                reader = PdfReader(file)
-                for page in reader.pages[:15]: 
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-            elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
-                image_bytes = file.read()
-                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                
-                transcription_response = client.models.generate_content(
-                    model='gemini-3.5-flash-lite',
-                    contents=["Transcribe readable text from this syllabus image perfectly. Raw text only.", image_part]
-                )
-                text = transcription_response.text
-            else:
-                return jsonify({"detail": "Unsupported file format."}), 400
-                
-            if not text.strip():
-                return jsonify({"detail": "Could not extract text from the syllabus."}), 400
-                
-        # Route 2: Generated Schedule via Extracted Chapter Topics
-        elif request.is_json and 'topics' in request.json:
-            is_macro = False
-            data = request.json
-            topics_json = json.dumps(data.get('topics', []))
-            exam_date = data.get('exam_date', '')
-            study_hours = data.get('study_hours', 2)
-            
-        else:
-            return jsonify({"detail": "No valid data provided to build schedule."}), 400
-
-        if is_macro:
-            prompt = (
-                f"You are a Master Study Planner. The student provided their course/exam syllabus below.\n"
-                f"Target Exam Date: {exam_date}\n"
-                f"Daily Study Hours Available: {study_hours}\n\n"
-                f"Syllabus Content:\n{text[:30000]}\n\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "1. Map out core subjects into a realistic daily study schedule up to the Exam Date.\n"
-                "2. Allocate estimated minutes per topic. Do not exceed daily hours.\n"
-                "3. Keep the schedule concise so it generates quickly. Group minor topics together.\n"
-                "Return ONLY a JSON object with this exact structure:\n"
-                "{\n"
-                '  "schedule": [\n'
-                '    {\n'
-                '      "day": 1, \n'
-                '      "date": "YYYY-MM-DD", \n'
-                '      "focus_area": "Subject Name",\n'
-                '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
-                '      "total_hours_today": 2.5, \n'
-                '      "actionable_advice": "Advice"\n'
-                '    }\n'
-                "  ]\n"
-                "}"
-            )
-        else:
+        exam_date = data.get('exam_date', '')
+        study_hours = data.get('study_hours', 2)
+        selected_subjects = data.get('selected_subjects', [])
+        syllabus_text = data.get('syllabus_text', '')
+        topics = data.get('topics', [])
+        
+        if topics:
+            topics_json = json.dumps(topics)
             prompt = (
                 f"You are a study planner utilizing Spaced Repetition.\n"
                 f"Exam Date: {exam_date}\n"
@@ -229,6 +212,28 @@ def generate_schedule():
                 '      "focus_area": "Active Recall",\n'
                 '      "topics": [{"name": "Topic 1", "estimated_minutes": 30}], \n'
                 '      "total_hours_today": 0.75, \n'
+                '      "actionable_advice": "Advice"\n'
+                '    }\n'
+                "  ]\n"
+                "}"
+            )
+        else:
+            subjects_str = ", ".join(selected_subjects) if selected_subjects else "All Subjects"
+            prompt = (
+                f"You are a Master Study Planner. Build a custom study schedule based on the syllabus text below.\n"
+                f"Target Exam Date: {exam_date}\n"
+                f"Daily Study Hours Available: {study_hours}\n"
+                f"ONLY include these selected subjects: [{subjects_str}]. Ignore any other subjects found in the syllabus text.\n\n"
+                f"Syllabus Content:\n{syllabus_text[:30000]}\n\n"
+                "Return ONLY a JSON object with this exact structure:\n"
+                "{\n"
+                '  "schedule": [\n'
+                '    {\n'
+                '      "day": 1, \n'
+                '      "date": "YYYY-MM-DD", \n'
+                '      "focus_area": "Subject Name",\n'
+                '      "topics": [{"name": "Specific Topic", "estimated_minutes": 45}], \n'
+                '      "total_hours_today": 2.5, \n'
                 '      "actionable_advice": "Advice"\n'
                 '    }\n'
                 "  ]\n"
@@ -363,7 +368,6 @@ KAPARSH_FRONTEND = r"""
 
         <main class="w-full">
             
-            <!-- Upgraded Master Loader -->
             <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
                 <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
                 <p id="loader-title" class="text-base font-bold text-white mb-2">Processing Document...</p>
@@ -417,14 +421,14 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule (Master Syllabus Planner) -->
+            <!-- Tab: Schedule (Master Syllabus Planner with Subject Picker) -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
                 <div id="schedule-setup" class="flex flex-col items-center justify-center py-10 text-center">
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
                         <i class="fa-solid fa-map-location-dot text-3xl text-blurple"></i>
                     </div>
                     <h3 class="text-lg font-bold mb-2">Master Syllabus Planner</h3>
-                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your course syllabus / datesheet to generate a daily timeline.</p>
+                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your course syllabus. We'll parse the subjects so you can select what to study.</p>
                     
                     <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-6 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
                         <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
@@ -435,11 +439,17 @@ KAPARSH_FRONTEND = r"""
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
+                    <!-- Subject Selection Checklist Area (Injected dynamically) -->
+                    <div id="subject-selector-area" class="w-full max-w-sm mb-6 hidden">
+                        <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3 text-left">Select Subjects to Include:</p>
+                        <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
                     <button onclick="generateSchedule()" class="w-full max-w-sm bg-blurple text-white font-bold py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(88,101,242,0.3)]">
                         Build Master Plan
                     </button>
-                    
-                    <p class="text-xs text-neutral-500 mt-4 px-4 font-medium">(Or leave empty to build a Schedule based strictly on your extracted Chapter Topics)</p>
                 </div>
                 
                 <div id="schedule-result" class="hidden flex-col gap-4 relative"></div>
@@ -518,6 +528,7 @@ KAPARSH_FRONTEND = r"""
             quiz: null,
             file: null,
             syllabusFile: null,
+            syllabusContextText: "",
             globalBannedTerms: [] 
         };
 
@@ -539,13 +550,51 @@ KAPARSH_FRONTEND = r"""
         const syllabusInput = document.getElementById('syllabus-upload');
         const syllabusNameDisplay = document.getElementById('syllabus-file-name');
         
-        syllabusInput.addEventListener('change', () => {
+        syllabusInput.addEventListener('change', async () => {
             if (syllabusInput.files.length > 0) {
                 AppState.syllabusFile = syllabusInput.files[0];
                 syllabusNameDisplay.textContent = AppState.syllabusFile.name;
                 syllabusNameDisplay.classList.add('text-blurple');
+                
+                // Instantly parse syllabus subjects for student selection
+                await parseSyllabusSubjects();
             }
         });
+
+        async function parseSyllabusSubjects() {
+            toggleLoader(true, 'Parsing Syllabus...', 'Extracting subjects so you can select what to study...');
+            const formData = new FormData();
+            formData.append('file', AppState.syllabusFile);
+
+            try {
+                const response = await fetch('/api/parse-syllabus', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Failed to parse syllabus");
+
+                AppState.syllabusContextText = data.full_text;
+                renderSubjectCheckboxes(data.subjects);
+                toggleLoader(false);
+            } catch (err) {
+                toggleLoader(false);
+                alert("Could not auto-detect subjects: " + err.message + ". You can still build your plan normally.");
+            }
+        }
+
+        function renderSubjectCheckboxes(subjects) {
+            const area = document.getElementById('subject-selector-area');
+            const container = document.getElementById('subject-checkboxes');
+            
+            if (!subjects || subjects.length === 0) return;
+
+            container.innerHTML = subjects.map((sub, i) => `
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="syllabus-subject" value="${sub}" checked class="w-4 h-4 accent-blurple rounded bg-dark border-borderline">
+                    <span class="text-xs text-neutral-200 font-medium">${sub}</span>
+                </label>
+            `).join('');
+            
+            area.classList.remove('hidden');
+        }
 
         const navBtns = document.querySelectorAll('.nav-btn');
         const tabPanes = document.querySelectorAll('.tab-pane');
@@ -593,7 +642,7 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via server...<br>(This ensures your mobile browser doesn\'t crash)');
+            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via server...');
 
             try {
                 const formData = new FormData();
@@ -603,7 +652,7 @@ KAPARSH_FRONTEND = r"""
                 const rawText = await response.text();
                 
                 if (!response.ok) {
-                    let errMsg = "Network request failed. Your file might be too large.";
+                    let errMsg = "Network request failed.";
                     try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
@@ -725,7 +774,7 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
-        // Macro-Planner Logic
+        // Macro-Planner Logic with Subject Filtering
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
@@ -735,17 +784,28 @@ KAPARSH_FRONTEND = r"""
                 return alert("Please set your Exam Date on the Home tab first.");
             }
 
-            toggleLoader(true, 'Building Master Plan...', 'Reading syllabus and mapping out daily goals.<br>(This is a heavy AI task, please wait ~20 seconds)');
+            // Gather selected subjects if any checkboxes exist
+            const selectedSubjects = [];
+            document.querySelectorAll('input[name="syllabus-subject"]:checked').forEach(cb => {
+                selectedSubjects.push(cb.value);
+            });
+
+            toggleLoader(true, 'Building Master Plan...', 'Mapping out your timeline based on your selected subjects...');
 
             try {
                 let response;
                 
                 if (AppState.syllabusFile) {
-                    const formData = new FormData();
-                    formData.append('file', AppState.syllabusFile);
-                    formData.append('exam_date', examDate);
-                    formData.append('study_hours', studyHours);
-                    response = await fetch('/api/schedule', { method: 'POST', body: formData });
+                    response = await fetch('/api/schedule', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            syllabus_text: AppState.syllabusContextText, 
+                            exam_date: examDate, 
+                            study_hours: parseFloat(studyHours),
+                            selected_subjects: selectedSubjects
+                        })
+                    });
                 } 
                 else if (AppState.topics && AppState.topics.length > 0) {
                     const loadedTopics = AppState.topics.filter(t => t.loaded);
@@ -760,7 +820,7 @@ KAPARSH_FRONTEND = r"""
 
                 const rawText = await response.text();
                 if (!response.ok) {
-                    let errMsg = "Schedule request failed. Connection dropped or file too large.";
+                    let errMsg = "Schedule request failed.";
                     try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
@@ -777,9 +837,8 @@ KAPARSH_FRONTEND = r"""
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
-            
             if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
-                return showError("AI failed to format the schedule correctly. Please try again.");
+                return showError("Invalid schedule data received.");
             }
             
             container.innerHTML = AppState.schedule.map((day) => `
@@ -822,7 +881,6 @@ KAPARSH_FRONTEND = r"""
                 if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Quiz Generation Failed");
                 
                 AppState.quiz = JSON.parse(rawText).quiz;
-                
                 if (!AppState.quiz || !Array.isArray(AppState.quiz)) throw new Error("AI output was invalid.");
                 
                 renderQuiz();
