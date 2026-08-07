@@ -27,29 +27,18 @@ def health_check():
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze_pdf():
-    if 'file' not in request.files:
-        return jsonify({"detail": "No file uploaded."}), 400
-        
-    file = request.files['file']
-    filename = file.filename.lower()
-    
-    if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-        return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
-        
     try:
-        client = get_gemini_client()
         text = ""
+        client = get_gemini_client()
         
-        # Safe Server-Side PDF Extraction
-        if filename.endswith(".pdf"):
-            reader = PdfReader(file)
-            for page in reader.pages[:25]:
-                extracted = page.extract_text()
-                if extracted:
-                    text += extracted + "\n"
-                    
-        # Safe Server-Side Image Extraction (Gemini OCR)
-        else:
+        # Route 1: Image Upload (Direct OCR via Gemini)
+        if 'file' in request.files:
+            file = request.files['file']
+            filename = file.filename.lower()
+            
+            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+                
             image_bytes = file.read()
             mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
             image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
@@ -62,9 +51,16 @@ def analyze_pdf():
                 ]
             )
             text = transcription_response.text
-                
-        if not text.strip():
-            return jsonify({"detail": "Could not extract text from the provided file."}), 400
+            
+        # Route 2: Pre-Extracted Text from Frontend (Bypasses Vercel 4.5MB Payload Limit)
+        elif request.is_json and 'text' in request.json:
+            text = request.json['text']
+            
+        else:
+            return jsonify({"detail": "No valid file or text payload provided."}), 400
+            
+        if not text or not text.strip():
+            return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
             
         prompt = (
             "You are an AI study assistant. Read the following text and identify all the distinct, primary concepts and topics covered in the material. "
@@ -148,7 +144,7 @@ def generate_schedule():
         topics_json = "[]"
         is_macro = False
         
-        # Route 1: Uploaded a Master Syllabus File (PDF or Image)
+        # Route 1: Image Upload (Direct OCR via Gemini)
         if 'file' in request.files:
             is_macro = True
             file = request.files['file']
@@ -156,40 +152,45 @@ def generate_schedule():
             study_hours = request.form.get('study_hours', 2)
             
             filename = file.filename.lower()
+            if not (filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+                return jsonify({"detail": "Only Images (.png, .jpg, .jpeg) are supported for direct file upload."}), 400
+                
+            image_bytes = file.read()
+            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
             
-            if filename.endswith(".pdf"):
-                reader = PdfReader(file)
-                for page in reader.pages[:15]:  # Safe limit to avoid memory overflow
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-            elif filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg"):
-                image_bytes = file.read()
-                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                
-                transcription_response = client.models.generate_content(
-                    model='gemini-3.5-flash-lite',
-                    contents=["Transcribe all readable text in this syllabus image perfectly. Return only raw text.", image_part]
-                )
-                text = transcription_response.text
-            else:
-                return jsonify({"detail": "Unsupported file format."}), 400
-                
-            if not text.strip():
-                return jsonify({"detail": "Could not extract text from the syllabus."}), 400
-                
-        # Route 2: Generated Schedule via Extracted Chapter Topics
-        elif request.is_json and 'topics' in request.json:
+            transcription_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=[
+                    "Transcribe all readable text in this syllabus image perfectly. Return only raw text.", 
+                    image_part
+                ]
+            )
+            text = transcription_response.text
+            
+        # Route 2: Pre-Extracted Text from Frontend
+        elif request.is_json and 'syllabus_text' in request.json:
+            is_macro = True
             data = request.json
-            topics_json = json.dumps(data.get('topics', []))
+            text = data.get('syllabus_text', '')
             exam_date = data.get('exam_date')
             study_hours = data.get('study_hours', 2)
+            
+        # Route 3: Extracted Chapter Topics
+        elif request.is_json and 'topics' in request.json:
+            is_macro = False
+            data = request.json
+            topics_json = json.dumps(data.get('topics', []))
+            exam_date = data.get('exam_date', '')
+            study_hours = data.get('study_hours', 2)
+            
         else:
             return jsonify({"detail": "No valid data provided to build schedule."}), 400
 
-        # Dynamic AI Prompt Logic
         if is_macro:
+            if not text or not text.strip():
+                return jsonify({"detail": "Could not extract syllabus text. Please try a clearer document."}), 400
+                
             prompt = (
                 f"You are a Master Study Planner. The student has provided their complete course/exam syllabus below.\n"
                 f"Target Exam Date: {exam_date}\n"
@@ -347,30 +348,17 @@ KAPARSH_FRONTEND = r"""
     </script>
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- html2pdf for Native Download -->
+    <!-- html2pdf & pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
-        body {
-            background-color: #000;
-            color: #fff;
-            -webkit-tap-highlight-color: transparent;
-            -webkit-user-select: none;
-            user-select: none;
-        }
+        body { background-color: #000; color: #fff; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
         ::selection { background: transparent; }
         ::-moz-selection { background: transparent; }
         input { -webkit-user-select: auto; user-select: auto; }
         ::-webkit-scrollbar { display: none; }
-        
-        .loader {
-            border-top-color: #00FFA3;
-            -webkit-animation: spinner 1s linear infinite;
-            animation: spinner 1s linear infinite;
-        }
-        @keyframes spinner {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .loader { border-top-color: #00FFA3; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .nav-active { color: #fff !important; }
         .nav-active i { color: #5865F2; }
         .pdf-page { background-color: #000; color: #fff; }
@@ -389,7 +377,6 @@ KAPARSH_FRONTEND = r"""
         </header>
 
         <main class="w-full">
-            
             <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
                 <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
                 <p id="loader-text" class="text-sm font-semibold text-neutral-400">Processing...</p>
@@ -397,18 +384,16 @@ KAPARSH_FRONTEND = r"""
 
             <!-- Tab: Home (Micro Analyzer) -->
             <div id="tab-home" class="tab-pane block px-4 py-6">
-                
                 <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
                     <h2 class="text-2xl font-bold mb-1">Chapter Analysis</h2>
-                    <p class="text-xs text-neutral-400 mb-6">Set your parameters and upload a textbook chapter for deep-extraction notes and quizzes.</p>
+                    <p class="text-xs text-neutral-400 mb-6">Upload a textbook chapter for deep-extraction notes and quizzes.</p>
                     
                     <div class="space-y-4 relative z-10">
                         <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
                             <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
                             <input type="date" id="exam-date" class="bg-transparent text-right text-sm font-bold text-famneon outline-none" style="color-scheme: dark;">
                         </div>
-                        
                         <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
                             <label class="text-sm font-semibold text-neutral-300">Daily Hours</label>
                             <input type="number" id="study-hours" value="2" min="1" max="16" class="bg-transparent text-right text-sm font-bold text-white outline-none w-16">
@@ -418,15 +403,11 @@ KAPARSH_FRONTEND = r"""
 
                 <label id="drop-zone" for="file-upload" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative block overflow-hidden">
                     <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
-                        <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
-                            <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
-                        </div>
-                        <div class="w-12 h-12 bg-dark rounded-full flex items-center justify-center">
-                            <i class="fa-solid fa-image text-xl text-famneon"></i>
-                        </div>
+                        <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
+                        <i class="fa-solid fa-image text-xl text-famneon"></i>
                     </div>
                     <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Chapter (PDF/Img)</p>
-                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Processed safely on our servers.</p>
+                    <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Extracts locally on your device.</p>
                     <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                 </label>
 
@@ -441,7 +422,6 @@ KAPARSH_FRONTEND = r"""
                     <h2 class="text-xl font-bold">Notes Feed</h2>
                     <span id="topic-count" class="text-[10px] font-bold bg-card border border-borderline px-3 py-1 rounded-full text-neutral-400 uppercase tracking-wide"></span>
                 </div>
-                
                 <div id="topics-grid" class="bg-card rounded-3xl border border-borderline p-6 flex flex-col gap-6 shadow-lg">
                     <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
                         <i class="fa-solid fa-book-open text-4xl mb-4 text-neutral-600"></i>
@@ -450,14 +430,14 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule (Master Syllabus Planner) -->
+            <!-- Tab: Schedule -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
                 <div id="schedule-setup" class="flex flex-col items-center justify-center py-10 text-center">
                     <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
                         <i class="fa-solid fa-map-location-dot text-3xl text-blurple"></i>
                     </div>
                     <h3 class="text-lg font-bold mb-2">Master Syllabus Planner</h3>
-                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your entire course syllabus. We'll map out all subjects into a daily spaced-repetition timeline.</p>
+                    <p class="text-sm text-neutral-500 mb-6 px-4">Upload your course syllabus / datesheet to generate a daily timeline.</p>
                     
                     <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-6 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
                         <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
@@ -465,6 +445,7 @@ KAPARSH_FRONTEND = r"""
                             <i class="fa-solid fa-image text-xl text-famneon"></i>
                         </div>
                         <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus (PDF/Img)</p>
+                        <p class="text-xs text-neutral-500 mt-1 relative z-10 pointer-events-none">Extracts locally on your device.</p>
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
@@ -475,9 +456,7 @@ KAPARSH_FRONTEND = r"""
                     <p class="text-xs text-neutral-500 mt-4 px-4 font-medium">(Or leave empty to build a Schedule based strictly on your extracted Chapter Topics)</p>
                 </div>
                 
-                <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
-                    <!-- Injected by JS -->
-                </div>
+                <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent"></div>
             </div>
 
             <!-- Tab: Quiz -->
@@ -503,16 +482,12 @@ KAPARSH_FRONTEND = r"""
 
             <!-- Tab: Doubts -->
             <div id="tab-doubts" class="tab-pane hidden px-4 py-6 h-full flex flex-col">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-xl font-bold">Doubts</h2>
-                </div>
-                
+                <h2 class="text-xl font-bold mb-4">Doubts</h2>
                 <div id="chat-history" class="flex-1 overflow-y-auto flex flex-col gap-4 pb-10">
                     <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start shadow-sm">
-                        <p class="text-sm text-neutral-200">Hi! I've read your document. Ask me anything about the topics inside, and I'll clear your doubts.</p>
+                        <p class="text-sm text-neutral-200">Ask me anything about your analyzed chapter!</p>
                     </div>
                 </div>
-                
                 <div class="fixed bottom-[88px] left-0 right-0 mx-auto w-full max-w-md px-4 z-40">
                     <div class="bg-card border border-borderline rounded-full flex items-center p-1 shadow-lg shadow-black">
                         <input type="text" id="doubt-input" placeholder="Ask a question..." class="flex-1 bg-transparent text-white text-sm px-4 outline-none placeholder-neutral-500">
@@ -522,11 +497,9 @@ KAPARSH_FRONTEND = r"""
                     </div>
                 </div>
             </div>
-
         </main>
 
-        <!-- Bottom Navigation Bar -->
-        <nav class="fixed bottom-0 w-full max-w-md bg-dark/95 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50" data-html2canvas-ignore>
+        <nav class="fixed bottom-0 w-full max-w-md bg-dark/95 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50">
             <button class="nav-btn active text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-home">
                 <i class="fa-solid fa-house text-[22px]"></i>
                 <span class="text-[10px] font-medium">Home</span>
@@ -552,6 +525,10 @@ KAPARSH_FRONTEND = r"""
     </div>
 
     <script>
+        // Setup PDF.js Global Worker
+        const pdfjsLib = window['pdfjs-dist/build/pdf'];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
         const AppState = {
             extractedText: "",
             topics: null,
@@ -574,6 +551,7 @@ KAPARSH_FRONTEND = r"""
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
                 fileNameDisplay.classList.add('text-famneon');
+                fileNameDisplay.classList.remove('text-neutral-500');
             }
         });
         
@@ -594,7 +572,6 @@ KAPARSH_FRONTEND = r"""
         function switchTab(targetId) {
             navBtns.forEach(btn => btn.classList.remove('nav-active'));
             document.querySelector(`.nav-btn[data-target="${targetId}"]`).classList.add('nav-active');
-            
             tabPanes.forEach(pane => pane.classList.add('hidden'));
             document.getElementById(targetId).classList.remove('hidden');
             window.scrollTo(0, 0);
@@ -628,23 +605,55 @@ KAPARSH_FRONTEND = r"""
             switchTab('tab-home');
         };
 
-        // Micro-Analyzer Logic (Chapters)
+        // Micro-Analyzer
         document.getElementById('analyze-btn').addEventListener('click', async () => {
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            toggleLoader(true, 'Extracting document on secure server...');
+            let response;
+            let fullText = "";
 
             try {
-                const formData = new FormData();
-                formData.append('file', AppState.file);
-                
-                const response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                if (AppState.file.type === "application/pdf" || AppState.file.name.toLowerCase().endsWith(".pdf")) {
+                    toggleLoader(true, 'Extracting textbook locally...');
+                    
+                    const arrayBuffer = await AppState.file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    const maxPages = Math.min(pdf.numPages, 25);
+                    
+                    for (let i = 1; i <= maxPages; i++) {
+                        document.getElementById('loader-text').innerText = `Reading page ${i} of ${maxPages}...`;
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        const strings = content.items.map(item => item.str);
+                        fullText += strings.join(" ") + "\n";
+                        
+                        // THE UI UN-BLOCKER: Yields 30ms to the browser so the screen doesn't freeze or go blank
+                        await new Promise(resolve => setTimeout(resolve, 30));
+                    }
+                    
+                    if (!fullText.trim()) throw new Error("Could not read text from this PDF. It might be scanned/image-only.");
+                    if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
+                    
+                    toggleLoader(true, 'Synthesizing knowledge vectors...');
+                    response = await fetch('/api/analyze', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: fullText }) 
+                    });
+
+                } else {
+                    toggleLoader(true, 'Performing server-side OCR on image...');
+                    const formData = new FormData();
+                    formData.append('file', AppState.file);
+                    response = await fetch('/api/analyze', { method: 'POST', body: formData });
+                }
+
                 const rawText = await response.text();
                 
                 if (!response.ok) {
                     let errMsg = "Server Error";
-                    try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
+                    try { errMsg = JSON.parse(rawText).detail; } catch(e) { errMsg = "Upload failed."; }
                     throw new Error(errMsg);
                 }
                 
@@ -682,17 +691,13 @@ KAPARSH_FRONTEND = r"""
                 });
                 if (response.ok) {
                     const details = await response.json();
-                    
                     if (details.definitions && details.definitions.length > 0) {
-                        details.definitions.forEach(d => {
-                            AppState.globalBannedTerms.push(d.term);
-                        });
+                        details.definitions.forEach(d => AppState.globalBannedTerms.push(d.term));
                     }
-
                     AppState.topics[index] = { ...topic, ...details, loaded: true };
                     renderTopics(); 
                 }
-            } catch (e) { console.error("Failed to load", topic.title); }
+            } catch (e) { console.error("Failed to load topic detail", topic.title); }
         }
 
         function renderTopics() {
@@ -706,78 +711,65 @@ KAPARSH_FRONTEND = r"""
             grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
-                    <div class="border-b border-borderline pb-6 mb-6 last:border-0 last:mb-0 last:pb-0 opacity-50 animate-pulse">
-                        <div class="flex justify-between items-center mb-3">
-                            <h4 class="font-bold text-base w-2/3 h-5 bg-borderline rounded"></h4>
-                            <div class="w-4 h-4 border-2 border-borderline border-t-white rounded-full animate-spin"></div>
-                        </div>
-                        <div class="space-y-2 mt-4">
-                            <div class="h-2 bg-borderline rounded w-3/4"></div>
-                            <div class="h-2 bg-borderline rounded w-1/2"></div>
-                        </div>
+                    <div class="border-b border-borderline pb-6 mb-6 opacity-50 animate-pulse">
+                        <div class="h-5 bg-borderline rounded w-2/3 mb-3"></div>
+                        <div class="h-3 bg-borderline rounded w-3/4 mb-2"></div>
                     </div>`;
                 }
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.definitions.map(d => `
-                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl break-inside-avoid shadow-[0_0_15px_rgba(88,101,242,0.05)]">
-                                <p class="text-sm text-white leading-relaxed tracking-wide">
-                                    <strong class="text-blurple font-bold mr-2">${d.term}:</strong>${d.definition}
-                                </p>
+                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl">
+                                <p class="text-sm text-white"><strong class="text-blurple font-bold mr-2">${d.term}:</strong>${d.definition}</p>
                             </div>
                         `).join('')}
-                    </div>
-                ` : '';
+                    </div>` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.formulas.map(f => `
-                            <div class="bg-famneon/5 border border-famneon/20 p-4 rounded-xl flex flex-col items-center break-inside-avoid shadow-[0_0_15px_rgba(0,255,163,0.05)]">
-                                <p class="font-mono text-lg font-bold text-famneon tracking-wider drop-shadow-md">${f.equation}</p>
-                                <p class="text-xs text-white font-medium mt-1 tracking-wide">${f.meaning}</p>
+                            <div class="bg-famneon/5 border border-famneon/20 p-4 rounded-xl flex flex-col items-center">
+                                <p class="font-mono text-lg font-bold text-famneon">${f.equation}</p>
+                                <p class="text-xs text-white font-medium mt-1">${f.meaning}</p>
                             </div>
                         `).join('')}
-                    </div>
-                ` : '';
+                    </div>` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
                     <div class="mt-4 space-y-2">
                         ${t.derivations.map(d => `
-                            <div class="bg-dark border border-xblue/30 p-4 rounded-xl break-inside-avoid shadow-[0_0_15px_rgba(29,161,242,0.05)]">
-                                <p class="text-sm font-bold text-xblue mb-1 drop-shadow-md">${d.title}</p>
+                            <div class="bg-dark border border-xblue/30 p-4 rounded-xl">
+                                <p class="text-sm font-bold text-xblue mb-1">${d.title}</p>
                                 <p class="font-mono text-xs text-white leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
                         `).join('')}
-                    </div>
-                ` : '';
+                    </div>` : '';
 
-                const notesList = (t.notes || []).map(n => `<li class="mb-2 flex items-start text-sm text-white leading-relaxed tracking-wide"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
+                const notesList = (t.notes || []).map(n => `<li class="mb-2 flex items-start text-sm text-white"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
 
                 return `
-                <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0 break-inside-avoid">
+                <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0">
                     <div class="flex justify-between items-start mb-3">
                         <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest shadow-inner">${t.priority || 'MED'}</span>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest">${t.priority || 'MED'}</span>
                     </div>
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
-                    <ul class="mt-4 space-y-1">
-                        ${notesList}
-                    </ul>
-                </div>
-            `}).join('');
+                    <ul class="mt-4 space-y-1">${notesList}</ul>
+                </div>`;
+            }).join('');
         }
 
         function downloadNotes() {
             const element = document.getElementById('tab-summary');
             const opt = {
-                margin:       0.5,
-                filename:     'Kaparsh_Notes.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#000000' },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+                margin: 0.5,
+                filename: 'Kaparsh_Notes.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#000000' },
+                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
             };
             html2pdf().set(opt).from(element).save();
         }
@@ -792,21 +784,45 @@ KAPARSH_FRONTEND = r"""
                 return alert("Please set your Exam Date on the Home tab first.");
             }
 
-            toggleLoader(true, 'Analyzing syllabus & building master plan...');
+            toggleLoader(true, 'Analyzing syllabus...');
 
             try {
                 let response;
                 
-                // Case 1: Syllabus Upload (Macro Plan)
                 if (AppState.syllabusFile) {
-                    const formData = new FormData();
-                    formData.append('file', AppState.syllabusFile);
-                    formData.append('exam_date', examDate);
-                    formData.append('study_hours', studyHours);
-                    response = await fetch('/api/schedule', { method: 'POST', body: formData });
-                } 
-                // Case 2: Chapter Topics Extracted (Micro Plan)
-                else if (AppState.topics && AppState.topics.length > 0) {
+                    if (AppState.syllabusFile.type === "application/pdf" || AppState.syllabusFile.name.toLowerCase().endsWith(".pdf")) {
+                        const arrayBuffer = await AppState.syllabusFile.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        let fullText = "";
+                        
+                        const maxPages = Math.min(pdf.numPages, 15);
+                        for (let i = 1; i <= maxPages; i++) {
+                            document.getElementById('loader-text').innerText = `Reading syllabus page ${i} of ${maxPages}...`;
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            fullText += content.items.map(item => item.str).join(" ") + "\n";
+                            
+                            // THE UI UN-BLOCKER
+                            await new Promise(resolve => setTimeout(resolve, 30));
+                        }
+                        
+                        if (!fullText.trim()) throw new Error("Could not extract text. Document might be scanned.");
+                        if (fullText.length > 40000) fullText = fullText.substring(0, 40000);
+
+                        document.getElementById('loader-text').innerText = 'Building master plan...';
+                        response = await fetch('/api/schedule', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ syllabus_text: fullText, exam_date: examDate, study_hours: parseFloat(studyHours) })
+                        });
+                    } else {
+                        const formData = new FormData();
+                        formData.append('file', AppState.syllabusFile);
+                        formData.append('exam_date', examDate);
+                        formData.append('study_hours', studyHours);
+                        response = await fetch('/api/schedule', { method: 'POST', body: formData });
+                    }
+                } else if (AppState.topics && AppState.topics.length > 0) {
                     const loadedTopics = AppState.topics.filter(t => t.loaded);
                     response = await fetch('/api/schedule', {
                         method: 'POST',
@@ -814,12 +830,12 @@ KAPARSH_FRONTEND = r"""
                         body: JSON.stringify({ topics: loadedTopics, exam_date: examDate, study_hours: parseFloat(studyHours) })
                     });
                 } else {
-                    throw new Error("Please upload a Master Syllabus OR generate intelligence from a Chapter first.");
+                    throw new Error("Please upload a Master Syllabus OR analyze a Chapter on the Home tab first.");
                 }
 
                 const rawText = await response.text();
                 if (!response.ok) {
-                    let errMsg = "Server Error";
+                    let errMsg = "Schedule request failed";
                     try { errMsg = JSON.parse(rawText).detail; } catch(e) {}
                     throw new Error(errMsg);
                 }
@@ -831,37 +847,31 @@ KAPARSH_FRONTEND = r"""
                 document.getElementById('schedule-result').classList.remove('hidden');
                 document.getElementById('schedule-result').classList.add('flex');
                 toggleLoader(false);
-            } catch (err) { showError(err.message); }
+            } catch (err) { showError(err.message || "Failed to fetch schedule."); }
         }
 
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
-            
             if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
-                return showError("AI failed to format the schedule correctly. Please try again.");
+                return showError("Invalid schedule data received.");
             }
             
             container.innerHTML = AppState.schedule.map((day) => `
-                <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-card text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                        <span class="text-xs font-bold">${day.day || '-'}</span>
+                <div class="bg-card p-5 rounded-2xl border border-borderline">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
+                        <span class="text-neutral-500 text-[10px] font-bold">${day.total_hours_today || 0}h</span>
                     </div>
-                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
-                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today || 0}h</span>
-                        </div>
-                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Block'}</h4>
-                        <div class="flex flex-col gap-2 mb-4">
-                            ${(day.topics || []).map(t => `
-                                <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
-                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
-                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
+                    <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Day'}</h4>
+                    <div class="flex flex-col gap-2 mb-4">
+                        ${(day.topics || []).map(t => `
+                            <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
+                                <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
+                                <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
+                            </div>
+                        `).join('')}
                     </div>
+                    <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
                 </div>
             `).join('');
         }
@@ -878,12 +888,9 @@ KAPARSH_FRONTEND = r"""
                 });
                 
                 const rawText = await response.text();
-                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
+                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Quiz Generation Failed");
                 
                 AppState.quiz = JSON.parse(rawText).quiz;
-                
-                if (!AppState.quiz || !Array.isArray(AppState.quiz)) throw new Error("AI output was invalid.");
-                
                 renderQuiz();
                 
                 document.getElementById('quiz-setup').classList.add('hidden');
@@ -900,9 +907,9 @@ KAPARSH_FRONTEND = r"""
             container.innerHTML = AppState.quiz.map((q, index) => `
                 <div id="qcard-${index}" class="bg-card p-6 rounded-3xl border border-borderline">
                     <p class="text-blurple font-bold text-xs mb-2">QUESTION ${index + 1}</p>
-                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question || 'Missing question'}</h4>
+                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question}</h4>
                     <div class="space-y-3">
-                        ${(q.options || []).map((opt, oIndex) => `
+                        ${(q.options || []).map(opt => `
                             <label class="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-borderline bg-dark active:bg-neutral-900 transition-colors">
                                 <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-5 h-5 accent-blurple bg-dark border-borderline">
                                 <span class="text-sm text-neutral-200 font-medium">${opt}</span>
@@ -934,16 +941,13 @@ KAPARSH_FRONTEND = r"""
                             <p class="text-xs text-famneon/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
                     card.classList.add('border-famneon/50');
-                    card.classList.remove('border-borderline');
                 } else {
                     resultDiv.innerHTML = `
                         <div class="p-4 bg-danger/10 border border-danger/30 rounded-2xl mt-4">
                             <p class="text-danger font-bold text-sm mb-2">Incorrect</p>
-                            <p class="text-xs mb-3 text-white">Correct: <span class="font-bold text-danger">${q.correct_answer}</span></p>
                             <p class="text-xs text-danger/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
                     card.classList.add('border-danger/50');
-                    card.classList.remove('border-borderline');
                 }
             });
             
@@ -965,15 +969,10 @@ KAPARSH_FRONTEND = r"""
             const input = document.getElementById('doubt-input');
             const question = input.value.trim();
             if (!question) return;
-            if (!AppState.extractedText) return alert("Please upload and process a Chapter first to use doubts.");
+            if (!AppState.extractedText) return alert("Please upload and process a Chapter first to ask doubts.");
 
             const chatHistory = document.getElementById('chat-history');
-            
-            chatHistory.innerHTML += `
-                <div class="bg-blurple text-white p-4 rounded-2xl rounded-tr-sm max-w-[85%] self-end shadow-md">
-                    <p class="text-sm">${question}</p>
-                </div>
-            `;
+            chatHistory.innerHTML += `<div class="bg-blurple text-white p-4 rounded-2xl rounded-tr-sm max-w-[85%] self-end shadow-md"><p class="text-sm">${question}</p></div>`;
             input.value = '';
             window.scrollTo(0, document.body.scrollHeight);
 
@@ -983,8 +982,7 @@ KAPARSH_FRONTEND = r"""
                     <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce"></div>
                     <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
                     <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                </div>
-            `;
+                </div>`;
             window.scrollTo(0, document.body.scrollHeight);
 
             try {
@@ -1000,11 +998,7 @@ KAPARSH_FRONTEND = r"""
                 if (!response.ok) throw new Error(data.detail || "Server Error");
                 
                 const formattedAnswer = data.answer.replace(/\n/g, '<br>');
-                chatHistory.innerHTML += `
-                    <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[90%] self-start shadow-sm">
-                        <p class="text-sm text-neutral-200 leading-relaxed">${formattedAnswer}</p>
-                    </div>
-                `;
+                chatHistory.innerHTML += `<div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[90%] self-start shadow-sm"><p class="text-sm text-neutral-200 leading-relaxed">${formattedAnswer}</p></div>`;
                 window.scrollTo(0, document.body.scrollHeight);
             } catch (err) {
                 document.getElementById(loaderId).remove();
