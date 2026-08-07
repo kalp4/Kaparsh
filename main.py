@@ -4,7 +4,6 @@ import json
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from pypdf import PdfReader
 from google import genai
 from google.genai import types
 
@@ -28,41 +27,33 @@ def health_check():
 @app.route("/api/analyze", methods=["POST"])
 def analyze_pdf():
     try:
-        text = ""
         client = get_gemini_client()
         
-        if 'file' in request.files:
-            file = request.files['file']
-            filename = file.filename.lower()
+        if 'file' not in request.files:
+            return jsonify({"detail": "No file uploaded."}), 400
             
-            if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
-                return jsonify({"detail": "Only PDF and Image files (.png, .jpg, .jpeg) are supported."}), 400
-                
-            if filename.endswith(".pdf"):
-                reader = PdfReader(file)
-                for page in reader.pages[:20]:
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-            else:
-                image_bytes = file.read()
-                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                
-                transcription_response = client.models.generate_content(
-                    model='gemini-3.5-flash-lite',
-                    contents=[
-                        "You are an OCR system. Transcribe all readable text in this image perfectly without commentary.", 
-                        image_part
-                    ]
-                )
-                text = transcription_response.text
-                
-        else:
-            return jsonify({"detail": "No valid file payload provided."}), 400
+        file = request.files['file']
+        filename = file.filename.lower()
+        
+        if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+            return jsonify({"detail": "Only PDF and Image files (.pdf, .png, .jpg, .jpeg) are supported."}), 400
+            
+        file_bytes = file.read()
+        mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
+        file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+        
+        # Native Multimodal Extraction via Gemini
+        extraction_response = client.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=[
+                "Extract all readable text from this document perfectly. Return only the raw text.",
+                file_part
+            ]
+        )
+        text = extraction_response.text
             
         if not text or not text.strip():
-            return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
+            return jsonify({"detail": "Could not extract text. The document might be completely blank."}), 400
             
         prompt = (
             "You are an AI study assistant. Read the following text and identify all distinct, primary concepts.\n"
@@ -97,46 +88,38 @@ def analyze_pdf():
 def parse_syllabus():
     try:
         client = get_gemini_client()
-        text = ""
         
-        if 'file' in request.files:
-            file = request.files['file']
-            filename = file.filename.lower()
+        if 'file' not in request.files:
+            return jsonify({"detail": "No file uploaded."}), 400
             
-            if filename.endswith(".pdf"):
-                reader = PdfReader(file)
-                for page in reader.pages[:15]:
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted + "\n"
-            else:
-                image_bytes = file.read()
-                mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
-                image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-                transcription_response = client.models.generate_content(
-                    model='gemini-3.5-flash-lite',
-                    contents=["Transcribe readable text from this syllabus image perfectly. Raw text only.", image_part]
-                )
-                text = transcription_response.text
-                
-        if not text.strip():
-            return jsonify({"detail": "Could not extract text from the syllabus."}), 400
+        file = request.files['file']
+        filename = file.filename.lower()
+        
+        if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
+            return jsonify({"detail": "Only PDF and Image files (.pdf, .png, .jpg, .jpeg) are supported."}), 400
             
+        file_bytes = file.read()
+        mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
+        file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+        
+        # Native Multimodal Syllabus Reading
         prompt = (
-            "Analyze the following syllabus text and extract a clean list of all distinct subjects found in it.\n"
-            "Return ONLY a JSON object with this exact structure:\n"
+            "Analyze this syllabus/datesheet document. Extract two things:\n"
+            "1. 'subjects': A clean array of all distinct subjects found in it.\n"
+            "2. 'full_text': The complete readable text extracted from the document.\n"
+            "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
-            '  "subjects": ["Subject 1", "Subject 2", "Subject 3"],\n'
-            '  "full_text": "Full extracted text context"\n'
+            '  "subjects": ["Subject 1", "Subject 2"],\n'
+            '  "full_text": "Complete text..."\n'
             "}\n\n"
-            f"Text:\n{text[:30000]}"
         )
         
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
-            contents=prompt,
+            contents=[prompt, file_part],
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
         )
+        
         return jsonify(json.loads(response.text))
         
     except Exception as e:
@@ -439,7 +422,7 @@ KAPARSH_FRONTEND = r"""
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
-                    <!-- Subject Selection Checklist Area (Injected dynamically) -->
+                    <!-- Subject Selection Checklist Area -->
                     <div id="subject-selector-area" class="w-full max-w-sm mb-6 hidden">
                         <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3 text-left">Select Subjects to Include:</p>
                         <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left">
@@ -556,7 +539,6 @@ KAPARSH_FRONTEND = r"""
                 syllabusNameDisplay.textContent = AppState.syllabusFile.name;
                 syllabusNameDisplay.classList.add('text-blurple');
                 
-                // Instantly parse syllabus subjects for student selection
                 await parseSyllabusSubjects();
             }
         });
@@ -774,7 +756,7 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
-        // Macro-Planner Logic with Subject Filtering
+        // Macro-Planner Logic with Subject Filtering Support
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
@@ -784,7 +766,6 @@ KAPARSH_FRONTEND = r"""
                 return alert("Please set your Exam Date on the Home tab first.");
             }
 
-            // Gather selected subjects if any checkboxes exist
             const selectedSubjects = [];
             document.querySelectorAll('input[name="syllabus-subject"]:checked').forEach(cb => {
                 selectedSubjects.push(cb.value);
