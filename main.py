@@ -4,6 +4,7 @@ import json
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
+from pypdf import PdfReader
 from google import genai
 from google.genai import types
 
@@ -27,6 +28,7 @@ def health_check():
 @app.route("/api/analyze", methods=["POST"])
 def analyze_pdf():
     try:
+        text = ""
         client = get_gemini_client()
         
         if 'file' not in request.files:
@@ -38,21 +40,28 @@ def analyze_pdf():
         if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
             return jsonify({"detail": "Only PDF and Image files (.pdf, .png, .jpg, .jpeg) are supported."}), 400
             
-        file_bytes = file.read()
-        mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
-        file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
-        
-        extraction_response = client.models.generate_content(
-            model='gemini-3.5-flash-lite',
-            contents=[
-                "Extract all readable text from this document perfectly. Return only the raw text.",
-                file_part
-            ]
-        )
-        text = extraction_response.text
+        if filename.endswith(".pdf"):
+            reader = PdfReader(file)
+            for page in reader.pages[:25]:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+        else:
+            image_bytes = file.read()
+            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            
+            transcription_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=[
+                    "You are an OCR system. Transcribe all readable text in this image perfectly without commentary.", 
+                    image_part
+                ]
+            )
+            text = transcription_response.text
             
         if not text or not text.strip():
-            return jsonify({"detail": "Could not extract text. The document might be completely blank."}), 400
+            return jsonify({"detail": "Could not extract text. The document might be completely blank or unreadable."}), 400
             
         prompt = (
             "You are an AI study assistant. Read the following text and identify all distinct, primary concepts.\n"
@@ -97,24 +106,38 @@ def parse_syllabus():
         if not (filename.endswith(".pdf") or filename.endswith(".png") or filename.endswith(".jpg") or filename.endswith(".jpeg")):
             return jsonify({"detail": "Only PDF and Image files (.pdf, .png, .jpg, .jpeg) are supported."}), 400
             
-        file_bytes = file.read()
-        mime_type = "application/pdf" if filename.endswith(".pdf") else ("image/png" if filename.endswith(".png") else "image/jpeg")
-        file_part = types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
-        
+        text = ""
+        if filename.endswith(".pdf"):
+            reader = PdfReader(file)
+            for page in reader.pages[:20]:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+        else:
+            image_bytes = file.read()
+            mime_type = "image/png" if filename.endswith(".png") else "image/jpeg"
+            image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+            transcription_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=["Transcribe readable text from this syllabus image perfectly. Raw text only.", image_part]
+            )
+            text = transcription_response.text
+                
+        if not text.strip():
+            return jsonify({"detail": "Could not extract text from the syllabus."}), 400
+            
         prompt = (
-            "Analyze this syllabus/datesheet document carefully. Extract two things:\n"
-            "1. 'subjects': A clean array of strings representing all distinct subjects or exam modules found in it (e.g., ['Mathematics', 'Physics', 'Chemistry']). If explicit subjects aren't labeled, extract the main course or module titles.\n"
-            "2. 'full_text': The complete readable text extracted from the document.\n"
+            "Analyze the following syllabus text and extract a clean list of all distinct subjects or modules found in it.\n"
             "Return ONLY a JSON object with this exact structure (no extra markdown):\n"
             "{\n"
-            '  "subjects": ["Subject 1", "Subject 2"],\n'
-            '  "full_text": "Complete text..."\n'
-            "}"
+            '  "subjects": ["Subject 1", "Subject 2", "Subject 3"]\n'
+            "}\n\n"
+            f"Text:\n{text[:30000]}"
         )
         
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
-            contents=[prompt, file_part],
+            contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
         )
         
@@ -125,7 +148,7 @@ def parse_syllabus():
 
         return jsonify({
             "subjects": subjects,
-            "full_text": parsed.get("full_text", "")
+            "full_text": text
         })
         
     except Exception as e:
@@ -363,7 +386,7 @@ KAPARSH_FRONTEND = r"""
                 <p id="loader-text" class="text-xs font-semibold text-neutral-400">Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)</p>
             </div>
 
-            <!-- Tab: Home (Micro Analyzer - Cleaned up without exam date/hours) -->
+            <!-- Tab: Home (Micro Analyzer) -->
             <div id="tab-home" class="tab-pane block px-4 py-6">
                 <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
@@ -399,7 +422,7 @@ KAPARSH_FRONTEND = r"""
                 </div>
             </div>
 
-            <!-- Tab: Schedule (Master Syllabus Planner with Exam Date, Daily Hours, & Subject Picker) -->
+            <!-- Tab: Schedule -->
             <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
                 <div id="schedule-setup" class="flex flex-col items-center justify-center py-4 text-center">
                     <div class="w-16 h-16 bg-card rounded-full flex items-center justify-center mb-3 border border-borderline">
@@ -408,7 +431,6 @@ KAPARSH_FRONTEND = r"""
                     <h3 class="text-lg font-bold mb-1">Master Syllabus Planner</h3>
                     <p class="text-xs text-neutral-500 mb-5 px-4">Set your timeline parameters, upload your syllabus, and pick your active subjects.</p>
                     
-                    <!-- Exam Date & Daily Hours Parameters (Moved here) -->
                     <div class="w-full max-w-sm space-y-3 mb-5">
                         <div class="bg-card rounded-2xl p-4 border border-borderline flex justify-between items-center">
                             <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
@@ -429,12 +451,9 @@ KAPARSH_FRONTEND = r"""
                         <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
                     </label>
 
-                    <!-- Subject Selection Checklist Area -->
                     <div id="subject-selector-area" class="w-full max-w-sm mb-6 hidden">
                         <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2 text-left">Select Subjects to Study:</p>
-                        <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left">
-                            <!-- Populated by JS -->
-                        </div>
+                        <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left"></div>
                     </div>
 
                     <button onclick="generateSchedule()" class="w-full max-w-sm bg-blurple text-white font-bold py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(88,101,242,0.3)]">
@@ -551,7 +570,7 @@ KAPARSH_FRONTEND = r"""
         });
 
         async function parseSyllabusSubjects() {
-            toggleLoader(true, 'Parsing Syllabus...', 'Multimodal AI is reading your syllabus & detecting subjects...');
+            toggleLoader(true, 'Parsing Syllabus...', 'Server is reading your syllabus & detecting subjects...');
             const formData = new FormData();
             formData.append('file', AppState.syllabusFile);
 
@@ -631,7 +650,7 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.file) return alert("Please upload a PDF or Image file first.");
 
             AppState.globalBannedTerms = []; 
-            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via multimodal AI...');
+            toggleLoader(true, 'Analyzing Chapter...', 'Reading document via server...');
 
             try {
                 const formData = new FormData();
@@ -763,7 +782,7 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
-        // Macro-Planner Logic with Subject Filtering Support
+        // Macro-Planner Logic
         async function generateSchedule() {
             const examDate = document.getElementById('schedule-exam-date').value;
             const studyHours = document.getElementById('schedule-study-hours').value;
