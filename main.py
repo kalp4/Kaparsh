@@ -186,7 +186,7 @@ def generate_quiz():
 
 
 # ==============================================================================
-# FRONTEND INJECTION
+# MOBILE NATIVE UI INJECTION
 # ==============================================================================
 
 KAPARSH_FRONTEND = """
@@ -194,8 +194,8 @@ KAPARSH_FRONTEND = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kaparsh — AI Study & Revision Agent</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kaparsh</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -203,18 +203,16 @@ KAPARSH_FRONTEND = """
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            900: '#312e81',
-                        }
+                        dark: '#000000',
+                        card: '#121212',
+                        borderline: '#262626',
+                        blurple: '#5865F2',
+                        famneon: '#00FFA3',
+                        xblue: '#1DA1F2',
+                        danger: '#ED4245'
                     },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-                        'float': '0 10px 30px -5px rgba(99, 102, 241, 0.15)',
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
                     }
                 }
             }
@@ -226,10 +224,15 @@ KAPARSH_FRONTEND = """
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body {
-            background-color: #f8fafc;
+            background-color: #000;
+            color: #fff;
+            -webkit-tap-highlight-color: transparent;
         }
+        /* Hide scrollbar for native app feel */
+        ::-webkit-scrollbar { display: none; }
+        
         .loader {
-            border-top-color: #4f46e5;
+            border-top-color: #00FFA3;
             -webkit-animation: spinner 1s linear infinite;
             animation: spinner 1s linear infinite;
         }
@@ -237,177 +240,156 @@ KAPARSH_FRONTEND = """
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .drag-active {
-            border-color: #4f46e5 !important;
-            background-color: #eef2ff !important;
+        .nav-active {
+            color: #fff !important;
         }
-        .tab-active {
-            border-bottom: 3px solid #4f46e5;
-            color: #4f46e5;
-            font-weight: 600;
+        .nav-active i {
+            color: #5865F2;
         }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         
-        /* A4 Page Styling for the PDF Export */
+        /* PDF specific styling to ensure it renders dark mode cleanly or inverts if needed */
         .pdf-page {
-            background: white;
-            padding: 1rem;
+            background-color: #000;
+            color: #fff;
         }
     </style>
 </head>
-<body class="min-h-screen font-sans antialiased text-slate-800 selection:bg-brand-100 selection:text-brand-900">
+<body class="antialiased overflow-x-hidden pb-24">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-white shadow-md shadow-brand-500/30">
-                    <i class="fa-solid fa-graduation-cap text-sm"></i>
-                </div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-900">Kaparsh</h1>
-            </div>
-            <div class="text-sm font-medium text-slate-500 hidden sm:block">AI Study & Revision Agent</div>
-        </div>
-    </header>
-
-    <!-- Main Layout -->
-    <main class="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <!-- Mobile Wrapper for Desktop Viewing -->
+    <div class="max-w-md mx-auto min-h-screen bg-dark relative border-x border-borderline shadow-2xl">
         
-        <!-- Sidebar -->
-        <aside class="lg:col-span-4 flex flex-col gap-6" data-html2canvas-ignore>
-            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-soft">
-                <h2 class="text-base font-bold mb-5 text-slate-900 flex items-center gap-2">
-                    <i class="fa-solid fa-sliders text-brand-500"></i> Configuration
-                </h2>
-                
-                <div class="space-y-5">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Exam Date</label>
-                            <input type="date" id="exam-date" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-slate-50">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Hours / Day</label>
-                            <input type="number" id="study-hours" value="2" min="1" max="16" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all bg-slate-50">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="mt-6 pt-6 border-t border-slate-100">
-                    <label class="block text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">Upload Material</label>
-                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50 p-8 text-center hover:bg-brand-50 hover:border-brand-300 transition-all cursor-pointer group">
-                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition-transform duration-300">
-                            <i class="fa-regular fa-file-pdf text-xl text-brand-500"></i>
-                        </div>
-                        <p class="text-sm text-slate-900 font-bold mb-1">Select Textbook PDF</p>
-                        <p id="file-name" class="text-xs text-slate-500 font-medium">Auto-scales up to 25 pages</p>
-                        <input type="file" id="file-upload" accept=".pdf" class="hidden">
-                    </div>
-                </div>
-
-                <button id="analyze-btn" class="w-full mt-6 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold py-3.5 px-4 rounded-xl shadow-md shadow-brand-500/25 hover:shadow-float hover:-translate-y-0.5 transition-all duration-300 flex items-center justify-center gap-2">
-                    Process Document <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </div>
-        </aside>
+        <!-- Header (IG iOS Style) -->
+        <header class="sticky top-0 z-40 bg-dark/80 backdrop-blur-md border-b border-borderline px-4 py-3 flex justify-between items-center" data-html2canvas-ignore>
+            <h1 class="text-xl font-bold tracking-tight">Kaparsh</h1>
+            <button id="download-btn" onclick="downloadNotes()" class="hidden w-8 h-8 rounded-full bg-card border border-borderline flex items-center justify-center active:scale-95 transition-transform">
+                <i class="fa-solid fa-arrow-down text-sm"></i>
+            </button>
+        </header>
 
         <!-- Main Content Area -->
-        <section class="lg:col-span-8">
-            <div class="bg-white rounded-2xl border border-slate-200 min-h-[600px] flex flex-col shadow-soft overflow-hidden">
+        <main class="w-full">
+            
+            <!-- Global Loader -->
+            <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
+                <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
+                <p id="loader-text" class="text-sm font-semibold text-neutral-400">Processing...</p>
+            </div>
+
+            <!-- Tab: Home (Setup & Upload) -->
+            <div id="tab-home" class="tab-pane block px-4 py-6">
                 
-                <!-- Tabs -->
-                <div class="flex border-b border-slate-200 bg-slate-50/50" data-html2canvas-ignore>
-                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition-colors tab-active flex items-center justify-center gap-2" data-target="tab-summary">
-                        <i class="fa-solid fa-book-open"></i> Study Notes
-                    </button>
-                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition-colors flex items-center justify-center gap-2" data-target="tab-schedule">
-                        <i class="fa-solid fa-calendar-day"></i> Schedule
-                    </button>
-                    <button class="tab-btn flex-1 py-4 text-sm font-medium text-slate-500 hover:text-brand-600 transition-colors flex items-center justify-center gap-2" data-target="tab-quiz">
-                        <i class="fa-solid fa-flask"></i> Practice Exam
-                    </button>
-                </div>
-
-                <!-- Loader -->
-                <div id="global-loader" class="hidden flex-1 flex flex-col items-center justify-center p-12">
-                    <div class="loader w-10 h-10 border-4 border-slate-100 rounded-full mb-5"></div>
-                    <p id="loader-text" class="text-sm font-bold text-brand-600 animate-pulse tracking-wide">Mapping Cognitive Structures...</p>
-                </div>
-
-                <!-- Empty State -->
-                <div id="empty-state" class="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                    <div class="w-16 h-16 bg-brand-50 flex items-center justify-center mb-5 rounded-2xl shadow-inner border border-brand-100">
-                        <i class="fa-solid fa-layer-group text-2xl text-brand-500"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-slate-900 mb-2">Workspace Ready</h3>
-                    <p class="text-sm text-slate-500 max-w-sm leading-relaxed">Upload a chapter to generate perfectly color-coded notes, formulas, and derivations.</p>
-                </div>
-
-                <!-- Tab Contents -->
-                <div id="tabs-container" class="hidden flex-1 p-8 overflow-y-auto bg-slate-50/30">
+                <!-- FamApp style neon hero card -->
+                <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
+                    <h2 class="text-2xl font-bold mb-1">New Material</h2>
+                    <p class="text-xs text-neutral-400 mb-6">Configure your study parameters and upload your document to begin.</p>
                     
-                    <!-- Notes Tab -->
-                    <div id="tab-summary" class="tab-pane block pdf-page">
-                        <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
-                            <div class="flex items-center gap-4">
-                                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Structured Notes</h2>
-                                <span id="topic-count" class="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-100 px-2.5 py-1 rounded-md"></span>
-                            </div>
-                            
-                            <!-- Save as PDF Button -->
-                            <button id="download-btn" onclick="downloadNotes()" class="hidden px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all flex items-center gap-2" data-html2canvas-ignore>
-                                <i class="fa-solid fa-download"></i> Download PDF
-                            </button>
+                    <div class="space-y-4 relative z-10">
+                        <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
+                            <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
+                            <input type="date" id="exam-date" class="bg-transparent text-right text-sm font-bold text-famneon outline-none" style="color-scheme: dark;">
                         </div>
-                        <div id="topics-grid" class="flex flex-col gap-8">
-                            <!-- Injected by JS -->
+                        
+                        <div class="bg-dark rounded-2xl p-4 border border-borderline flex justify-between items-center">
+                            <label class="text-sm font-semibold text-neutral-300">Daily Hours</label>
+                            <input type="number" id="study-hours" value="2" min="1" max="16" class="bg-transparent text-right text-sm font-bold text-white outline-none w-16">
                         </div>
                     </div>
+                </div>
 
-                    <!-- Schedule Tab -->
-                    <div id="tab-schedule" class="tab-pane hidden">
-                        <div id="schedule-setup" class="text-center py-20">
-                            <div class="w-16 h-16 bg-brand-50 mx-auto rounded-2xl flex items-center justify-center mb-5 text-brand-500 text-2xl">
-                                <i class="fa-regular fa-calendar-check"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-2">Generate Study Timeline</h3>
-                            <p class="text-sm text-slate-500 mb-8 max-w-sm mx-auto">Map your extracted topics to an algorithmic spaced repetition schedule.</p>
-                            <button onclick="generateSchedule()" class="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl shadow-md shadow-brand-500/25 hover:-translate-y-0.5 transition-all">
-                                Generate Plan
-                            </button>
-                        </div>
-                        <div id="schedule-result" class="hidden space-y-4">
-                            <!-- Injected by JS -->
-                        </div>
+                <!-- IG/X style file uploader -->
+                <div id="drop-zone" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors">
+                    <div class="w-14 h-14 bg-dark rounded-full flex items-center justify-center mb-3">
+                        <i class="fa-solid fa-plus text-xl text-blurple"></i>
                     </div>
+                    <p id="file-name" class="text-sm font-bold text-white">Tap to upload PDF</p>
+                    <p class="text-xs text-neutral-500 mt-1">Max 25 pages</p>
+                    <input type="file" id="file-upload" accept=".pdf" class="hidden">
+                </div>
 
-                    <!-- Quiz Tab -->
-                    <div id="tab-quiz" class="tab-pane hidden">
-                        <div id="quiz-setup" class="text-center py-20">
-                            <div class="w-16 h-16 bg-brand-50 mx-auto rounded-2xl flex items-center justify-center mb-5 text-brand-500 text-2xl">
-                                <i class="fa-solid fa-spell-check"></i>
-                            </div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-2">Knowledge Verification</h3>
-                            <p class="text-sm text-slate-500 mb-8 max-w-sm mx-auto">Test your comprehension with an AI-generated exam built from your document.</p>
-                            <button onclick="generateQuiz()" class="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold rounded-xl shadow-md shadow-brand-500/25 hover:-translate-y-0.5 transition-all">
-                                Start Exam
-                            </button>
-                        </div>
-                        <div id="quiz-result" class="hidden space-y-8">
-                            <div id="quiz-questions-container" class="space-y-8"></div>
-                            <button onclick="checkAnswers()" class="w-full py-4 bg-slate-900 text-white text-base font-bold rounded-xl mt-4 hover:bg-slate-800 transition-colors shadow-md hover:shadow-lg">
-                                Submit Answers
-                            </button>
-                            <div id="quiz-score-area"></div>
-                        </div>
+                <button id="analyze-btn" class="w-full bg-famneon text-black font-bold text-base py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(0,255,163,0.3)]">
+                    Generate Intelligence
+                </button>
+            </div>
+
+            <!-- Tab: Notes -->
+            <div id="tab-summary" class="tab-pane hidden px-4 py-6 pdf-page">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold">Notes Feed</h2>
+                    <span id="topic-count" class="text-[10px] font-bold bg-card border border-borderline px-3 py-1 rounded-full text-neutral-400 uppercase tracking-wide"></span>
+                </div>
+                
+                <div id="topics-grid" class="flex flex-col gap-6">
+                    <!-- Empty State -->
+                    <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                        <i class="fa-solid fa-folder-open text-4xl mb-4 text-neutral-600"></i>
+                        <p class="text-sm font-medium">No notes generated yet.</p>
                     </div>
-
                 </div>
             </div>
-        </section>
-    </main>
+
+            <!-- Tab: Schedule -->
+            <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
+                <div id="schedule-setup" class="flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
+                        <i class="fa-regular fa-calendar text-3xl text-blurple"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Spaced Repetition</h3>
+                    <p class="text-sm text-neutral-500 mb-8 px-4">Generate an algorithmic study timeline optimized for your exam date.</p>
+                    <button onclick="generateSchedule()" class="bg-white text-black font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
+                        Create Timeline
+                    </button>
+                </div>
+                <div id="schedule-result" class="hidden flex-col gap-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
+                    <!-- Injected by JS -->
+                </div>
+            </div>
+
+            <!-- Tab: Quiz -->
+            <div id="tab-quiz" class="tab-pane hidden px-4 py-6">
+                <div id="quiz-setup" class="flex flex-col items-center justify-center py-20 text-center">
+                    <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
+                        <i class="fa-solid fa-gamepad text-3xl text-famneon"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-2">Knowledge Check</h3>
+                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery with AI-generated distractor questions.</p>
+                    <button onclick="generateQuiz()" class="bg-blurple text-white font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
+                        Start Quiz
+                    </button>
+                </div>
+                <div id="quiz-result" class="hidden flex-col gap-6">
+                    <div id="quiz-questions-container" class="flex flex-col gap-6"></div>
+                    <button onclick="checkAnswers()" class="w-full bg-famneon text-black font-bold py-4 rounded-full mt-4 active:scale-95 transition-transform">
+                        Submit
+                    </button>
+                    <div id="quiz-score-area"></div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation Bar (iOS / X Style) -->
+        <nav class="fixed bottom-0 w-full max-w-md bg-dark/90 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50" data-html2canvas-ignore>
+            <button class="nav-btn active text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-home">
+                <i class="fa-solid fa-house text-[22px]"></i>
+                <span class="text-[10px] font-medium">Home</span>
+            </button>
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-summary">
+                <i class="fa-solid fa-layer-group text-[22px]"></i>
+                <span class="text-[10px] font-medium">Notes</span>
+            </button>
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-schedule">
+                <i class="fa-solid fa-calendar-day text-[22px]"></i>
+                <span class="text-[10px] font-medium">Plan</span>
+            </button>
+            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-16" data-target="tab-quiz">
+                <i class="fa-solid fa-flask text-[22px]"></i>
+                <span class="text-[10px] font-medium">Quiz</span>
+            </button>
+        </nav>
+
+    </div>
 
     <script>
         const AppState = {
@@ -418,74 +400,71 @@ KAPARSH_FRONTEND = """
             file: null
         };
 
+        // Setup Dates
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 7);
         document.getElementById('exam-date').valueAsDate = tomorrow;
 
+        // File Upload Logic
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-upload');
         const fileNameDisplay = document.getElementById('file-name');
 
         dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('bg-slate-100'); });
-        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('bg-slate-100'); });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('bg-slate-100');
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect();
-            }
-        });
-
-        fileInput.addEventListener('change', handleFileSelect);
-
-        function handleFileSelect() {
+        fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
-                fileNameDisplay.classList.add('text-brand-600', 'font-bold');
+                fileNameDisplay.classList.add('text-famneon');
+                fileNameDisplay.classList.remove('text-neutral-500');
             }
-        }
+        });
 
-        const tabBtns = document.querySelectorAll('.tab-btn');
+        // Bottom Navigation Logic
+        const navBtns = document.querySelectorAll('.nav-btn');
         const tabPanes = document.querySelectorAll('.tab-pane');
 
-        tabBtns.forEach(btn => {
+        function switchTab(targetId) {
+            navBtns.forEach(btn => btn.classList.remove('nav-active'));
+            document.querySelector(`.nav-btn[data-target="${targetId}"]`).classList.add('nav-active');
+            
+            tabPanes.forEach(pane => pane.classList.add('hidden'));
+            document.getElementById(targetId).classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        navBtns.forEach(btn => {
             btn.addEventListener('click', () => {
-                if (!AppState.topics) return; 
-                tabBtns.forEach(b => b.classList.remove('tab-active'));
-                btn.classList.add('tab-active');
-                tabPanes.forEach(pane => pane.classList.add('hidden'));
-                document.getElementById(btn.dataset.target).classList.remove('hidden');
+                const target = btn.dataset.target;
+                if (target !== 'tab-home' && !AppState.topics) return; 
+                switchTab(target);
             });
         });
 
+        // UI Helpers
         const toggleLoader = (show, text = 'Processing...') => {
             document.getElementById('loader-text').innerText = text;
             if (show) {
-                document.getElementById('empty-state').classList.add('hidden');
-                document.getElementById('tabs-container').classList.add('hidden');
+                tabPanes.forEach(pane => pane.classList.add('hidden'));
                 document.getElementById('global-loader').classList.remove('hidden');
+                document.getElementById('global-loader').classList.add('flex');
             } else {
                 document.getElementById('global-loader').classList.add('hidden');
-                document.getElementById('tabs-container').classList.remove('hidden');
+                document.getElementById('global-loader').classList.remove('flex');
             }
         };
 
         const showError = (msg) => {
             alert("Error: " + msg);
             toggleLoader(false);
-            if (!AppState.topics) {
-                document.getElementById('tabs-container').classList.add('hidden');
-                document.getElementById('empty-state').classList.remove('hidden');
-            }
+            switchTab('tab-home');
         };
 
+        // Core App Logic
         document.getElementById('analyze-btn').addEventListener('click', async () => {
-            if (!AppState.file) return alert("Please upload a PDF file.");
+            if (!AppState.file) return alert("Please upload a PDF file first.");
 
-            toggleLoader(true, 'Extracting conceptual framework...');
+            toggleLoader(true, 'Extracting framework...');
 
             const formData = new FormData();
             formData.append('file', AppState.file);
@@ -494,39 +473,29 @@ KAPARSH_FRONTEND = """
                 const response = await fetch('/api/analyze', { method: 'POST', body: formData });
                 const rawText = await response.text();
                 
-                if (!response.ok) {
-                    try {
-                        const errJson = JSON.parse(rawText);
-                        throw new Error(errJson.detail || "Server Error");
-                    } catch (parseErr) {
-                        throw new Error(`Network Error (${response.status}): The backend timed out or could not be reached.`);
-                    }
-                }
+                if (!response.ok) throw new Error(JSON.parse(rawText).detail || "Server Error");
                 
                 const data = JSON.parse(rawText);
                 AppState.extractedText = data.extracted_text;
-                
                 AppState.topics = data.topics.map(t => ({ title: t.title, loaded: false }));
                 
                 renderTopics();
-                tabBtns[0].click();
+                switchTab('tab-summary');
                 toggleLoader(false);
                 
+                // Micro-tasking sequential loads
                 for (let i = 0; i < AppState.topics.length; i++) {
                     await fetchTopicDetails(i);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
 
-                AppState.schedule = null;
-                AppState.quiz = null;
+                AppState.schedule = null; AppState.quiz = null;
                 document.getElementById('schedule-result').classList.add('hidden');
                 document.getElementById('schedule-setup').classList.remove('hidden');
                 document.getElementById('quiz-result').classList.add('hidden');
                 document.getElementById('quiz-setup').classList.remove('hidden');
 
-            } catch (err) {
-                showError(err.message);
-            }
+            } catch (err) { showError(err.message); }
         });
 
         async function fetchTopicDetails(index) {
@@ -535,145 +504,129 @@ KAPARSH_FRONTEND = """
                 const response = await fetch('/api/topic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: AppState.extractedText,
-                        topic: topic.title
-                    })
+                    body: JSON.stringify({ text: AppState.extractedText, topic: topic.title })
                 });
-                
                 if (response.ok) {
                     const details = await response.json();
                     AppState.topics[index] = { ...topic, ...details, loaded: true };
                     renderTopics(); 
                 }
-            } catch (e) {
-                console.error("Failed to load details for", topic.title);
-            }
+            } catch (e) { console.error("Failed to load", topic.title); }
         }
 
         function renderTopics() {
             const grid = document.getElementById('topics-grid');
-            document.getElementById('topic-count').innerText = `${AppState.topics.length} Core Topics`;
+            document.getElementById('topic-count').innerText = `${AppState.topics.length} Topics`;
             
-            const downloadBtn = document.getElementById('download-btn');
             if (AppState.topics.some(t => t.loaded)) {
-                downloadBtn.classList.remove('hidden');
+                document.getElementById('download-btn').classList.remove('hidden');
             }
             
             grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
-                    <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm opacity-70 animate-pulse">
-                        <div class="flex justify-between items-center mb-5">
-                            <h4 class="font-bold text-lg text-slate-800">${t.title}</h4>
-                            <div class="w-5 h-5 border-2 border-slate-200 border-t-brand-500 rounded-full animate-spin"></div>
+                    <div class="bg-card p-5 rounded-3xl border border-borderline opacity-50 animate-pulse">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-base w-2/3 h-5 bg-borderline rounded"></h4>
+                            <div class="w-4 h-4 border-2 border-borderline border-t-white rounded-full animate-spin"></div>
                         </div>
-                        <div class="space-y-3">
-                            <div class="h-2 bg-slate-100 rounded-full w-3/4"></div>
-                            <div class="h-2 bg-slate-100 rounded-full w-1/2"></div>
-                            <div class="h-2 bg-slate-100 rounded-full w-5/6"></div>
+                        <div class="space-y-2 mt-4">
+                            <div class="h-2 bg-borderline rounded w-3/4"></div>
+                            <div class="h-2 bg-borderline rounded w-1/2"></div>
                         </div>
                     </div>`;
                 }
 
-                const priorityStyles = {
-                    'High': 'bg-red-50 text-red-600 border-red-200',
-                    'Medium': 'bg-slate-100 text-slate-600 border-slate-200',
-                    'Low': 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                };
-                const pStyle = priorityStyles[t.priority] || priorityStyles['Medium'];
-                
-                // 1. Vibrant Definitions
+                // Vibrant Definitions (Discord Blurple)
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
-                    <div class="my-5 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.definitions.map(d => `
-                            <p class="text-sm text-slate-700 leading-relaxed bg-blue-50/50 p-3 rounded-xl border border-blue-100/50">
-                                <strong class="text-blue-600 font-bold text-base mr-1 drop-shadow-sm">${d.term}:</strong> ${d.definition}
-                            </p>
+                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl">
+                                <p class="text-sm text-neutral-300">
+                                    <strong class="text-blurple font-bold mr-1">${d.term}:</strong>${d.definition}
+                                </p>
+                            </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                // 2. Boxed & Highlighted Formulas
+                // Boxed Formulas (FamApp Neon)
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div class="my-6 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.formulas.map(f => `
-                            <div class="bg-amber-50 border border-amber-300 p-5 rounded-xl shadow-inner flex flex-col items-center gap-1 break-inside-avoid relative overflow-hidden">
-                                <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-amber-400"></div>
-                                <p class="font-mono text-xl font-bold text-amber-900 tracking-wide">${f.equation}</p>
-                                <p class="text-xs text-amber-700 uppercase tracking-widest font-bold mt-1">${f.meaning}</p>
+                            <div class="bg-famneon/10 border border-famneon/30 p-4 rounded-2xl flex flex-col items-center">
+                                <p class="font-mono text-lg font-bold text-famneon tracking-wider">${f.equation}</p>
+                                <p class="text-[10px] text-famneon/70 uppercase tracking-widest font-bold mt-1">${f.meaning}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                // 3. Different Color Derivations
+                // Derivations (X Blue)
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
-                    <div class="my-6 space-y-3">
+                    <div class="mt-4 space-y-2">
                         ${t.derivations.map(d => `
-                            <div class="bg-emerald-50/50 border-l-4 border-emerald-500 p-5 rounded-r-xl shadow-sm break-inside-avoid">
-                                <p class="text-sm font-bold text-emerald-800 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="fa-solid fa-code-branch"></i> ${d.title}</p>
-                                <p class="text-sm text-emerald-900 font-mono leading-relaxed whitespace-pre-wrap pl-2 border-l border-emerald-200">${d.content}</p>
+                            <div class="bg-card border border-xblue/30 p-4 rounded-2xl">
+                                <p class="text-xs font-bold text-xblue uppercase tracking-wider mb-2">${d.title}</p>
+                                <p class="text-xs text-neutral-300 font-mono leading-relaxed whitespace-pre-wrap">${d.content}</p>
                             </div>
                         `).join('')}
                     </div>
                 ` : '';
 
-                // General Notes
-                const notesList = t.notes.map(n => `<li class="mb-2.5 flex items-start text-sm text-slate-700 leading-relaxed"><div class="mt-1.5 mr-3 w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0"></div>${n}</li>`).join('');
+                // Bullet Notes
+                const notesList = t.notes.map(n => `<li class="mb-2 flex items-start text-sm text-neutral-300"><span class="text-neutral-600 mr-2">•</span>${n}</li>`).join('');
 
                 return `
-                <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm hover:shadow-md transition-shadow duration-300 break-inside-avoid">
-                    <div class="flex justify-between items-start mb-6">
-                        <h4 class="font-bold text-xl text-slate-900 tracking-tight pr-4">${t.title}</h4>
-                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-md border uppercase tracking-wider ${pStyle}">${t.priority}</span>
+                <div class="bg-card p-5 rounded-3xl border border-borderline">
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
+                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest">${t.priority}</span>
                     </div>
                     
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
                     
-                    <ul class="mb-6 mt-6">
+                    <ul class="mt-4">
                         ${notesList}
                     </ul>
                     
-                    <div class="mt-6 pt-5 border-t border-slate-100 bg-slate-50 rounded-xl p-5 border border-slate-100/50">
-                        <p class="text-[10px] uppercase font-bold text-brand-500 mb-2 tracking-widest flex items-center gap-1.5"><i class="fa-solid fa-lightbulb"></i> Analogy</p>
-                        <p class="text-sm text-slate-700 leading-relaxed font-medium">${t.analogy}</p>
+                    <div class="mt-5 pt-4 border-t border-borderline">
+                        <div class="flex items-start gap-2">
+                            <i class="fa-solid fa-bolt text-famneon mt-0.5 text-xs"></i>
+                            <div>
+                                <p class="text-[10px] uppercase font-bold text-neutral-500 mb-1 tracking-wider">Analogy</p>
+                                <p class="text-sm text-neutral-300 leading-relaxed">${t.analogy}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `}).join('');
         }
 
-        // PDF Download Script
         function downloadNotes() {
             const element = document.getElementById('tab-summary');
-            
-            // Add temporary styling specifically for PDF export
-            const originalGridClass = document.getElementById('topics-grid').className;
-            document.getElementById('topics-grid').className = "flex flex-col gap-4"; // Tighter gap for PDF
-
             const opt = {
-                margin:       [0.5, 0.5, 0.5, 0.5],
+                margin:       0.5,
                 filename:     'Kaparsh_Notes.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, windowWidth: 1024 }, // Set window width to force desktop layout in PDF
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#000000' },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
             };
-            
-            html2pdf().set(opt).from(element).save().then(() => {
-                // Restore original styling after download
-                document.getElementById('topics-grid').className = originalGridClass;
-            });
+            html2pdf().set(opt).from(element).save();
         }
 
         async function generateSchedule() {
             const examDate = document.getElementById('exam-date').value;
             const studyHours = document.getElementById('study-hours').value;
-            if (!examDate) return alert("Please set an exam date.");
+            if (!examDate) {
+                switchTab('tab-home');
+                return alert("Please set an exam date on the Home tab.");
+            }
 
             const loadedTopics = AppState.topics.filter(t => t.loaded);
-            toggleLoader(true, 'Structuring timeline...');
+            toggleLoader(true, 'Building timeline...');
 
             try {
                 const response = await fetch('/api/schedule', {
@@ -690,6 +643,7 @@ KAPARSH_FRONTEND = """
                 
                 document.getElementById('schedule-setup').classList.add('hidden');
                 document.getElementById('schedule-result').classList.remove('hidden');
+                document.getElementById('schedule-result').classList.add('flex');
                 toggleLoader(false);
             } catch (err) { showError(err.message); }
         }
@@ -697,20 +651,20 @@ KAPARSH_FRONTEND = """
         function renderSchedule() {
             const container = document.getElementById('schedule-result');
             container.innerHTML = AppState.schedule.map((day) => `
-                <div class="flex gap-5 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors">
-                    <div class="flex-shrink-0 text-center pr-6 border-r border-slate-100 flex flex-col justify-center">
-                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Day ${day.day}</span>
-                        <span class="text-xl font-bold text-slate-900">${day.date.split('-').slice(1).join('/')}</span>
+                <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                    <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-card text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                        <span class="text-xs font-bold">${day.day}</span>
                     </div>
-                    <div class="flex-1 py-1 pl-2">
-                        <div class="flex justify-between items-start mb-3">
-                            <h4 class="font-bold text-slate-900 text-base">${day.focus_area}</h4>
-                            <span class="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded">${day.hours_allocated} hrs</span>
+                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="text-famneon text-xs font-bold">${day.date.split('-').slice(1).join('/')}</span>
+                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.hours_allocated}h</span>
                         </div>
-                        <div class="flex flex-wrap gap-2 mb-4">
-                            ${day.topics_to_study.map(t => `<span class="text-xs px-2.5 py-1 bg-white border border-slate-200 text-slate-700 font-semibold rounded-md shadow-sm">${t}</span>`).join('')}
+                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area}</h4>
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            ${day.topics_to_study.map(t => `<span class="text-[10px] px-2 py-1 bg-dark border border-borderline text-neutral-300 rounded font-medium">${t}</span>`).join('')}
                         </div>
-                        <p class="text-sm text-slate-600 leading-relaxed font-medium"><i class="fa-solid fa-arrow-trend-up text-brand-400 mr-1.5"></i> ${day.actionable_advice}</p>
+                        <p class="text-xs text-neutral-400 leading-relaxed">${day.actionable_advice}</p>
                     </div>
                 </div>
             `).join('');
@@ -735,6 +689,7 @@ KAPARSH_FRONTEND = """
                 
                 document.getElementById('quiz-setup').classList.add('hidden');
                 document.getElementById('quiz-result').classList.remove('hidden');
+                document.getElementById('quiz-result').classList.add('flex');
                 toggleLoader(false);
             } catch (err) { showError(err.message); }
         }
@@ -744,14 +699,14 @@ KAPARSH_FRONTEND = """
             document.getElementById('quiz-score-area').innerHTML = ''; 
 
             container.innerHTML = AppState.quiz.map((q, index) => `
-                <div id="qcard-${index}" class="p-8 bg-white rounded-2xl border border-slate-200 shadow-sm relative">
-                    <div class="absolute -left-3 top-8 w-7 h-7 bg-brand-600 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-sm border-2 border-white">${index + 1}</div>
-                    <h4 class="font-bold text-lg mb-5 text-slate-900 leading-relaxed pl-2">${q.question}</h4>
+                <div id="qcard-${index}" class="bg-card p-6 rounded-3xl border border-borderline">
+                    <p class="text-blurple font-bold text-xs mb-2">QUESTION ${index + 1}</p>
+                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question}</h4>
                     <div class="space-y-3">
                         ${q.options.map((opt, oIndex) => `
-                            <label class="flex items-start gap-4 cursor-pointer p-4 rounded-xl border border-slate-200 hover:border-brand-400 hover:bg-brand-50 transition-all">
-                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="mt-1 w-4 h-4 text-brand-600 focus:ring-brand-500 border-slate-300">
-                                <span class="text-sm text-slate-700 font-medium">${opt}</span>
+                            <label class="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-borderline bg-dark active:bg-neutral-900 transition-colors">
+                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-5 h-5 accent-blurple bg-dark border-borderline">
+                                <span class="text-sm text-neutral-200 font-medium">${opt}</span>
                             </label>
                         `).join('')}
                     </div>
@@ -768,39 +723,36 @@ KAPARSH_FRONTEND = """
                 const card = document.getElementById(`qcard-${index}`);
                 
                 if (!selected) {
-                    resultDiv.innerHTML = `<div class="text-sm text-amber-600 font-bold py-3 px-4 bg-amber-50 rounded-xl mt-4 border border-amber-200"><i class="fa-solid fa-triangle-exclamation mr-2"></i> Please select an answer.</div>`;
+                    resultDiv.innerHTML = `<div class="text-sm text-danger font-bold py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i> Answer required</div>`;
                     return;
                 }
                 
                 if (selected.value === q.correct_answer) {
                     score++;
                     resultDiv.innerHTML = `
-                        <div class="p-5 bg-emerald-50 rounded-xl border border-emerald-200 mt-5">
-                            <p class="text-emerald-700 font-bold text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-circle-check"></i> Correct</p>
-                            <p class="text-sm text-emerald-800 leading-relaxed">${q.explanation}</p>
+                        <div class="p-4 bg-famneon/10 border border-famneon/30 rounded-2xl mt-4">
+                            <p class="text-famneon font-bold text-sm mb-1">Correct</p>
+                            <p class="text-xs text-famneon/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
-                    card.classList.add('border-emerald-400', 'ring-4', 'ring-emerald-50');
-                    card.classList.remove('border-slate-200');
+                    card.classList.add('border-famneon/50');
+                    card.classList.remove('border-borderline');
                 } else {
                     resultDiv.innerHTML = `
-                        <div class="p-5 bg-rose-50 rounded-xl border border-rose-200 mt-5">
-                            <p class="text-rose-700 font-bold text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-circle-xmark"></i> Incorrect</p>
-                            <p class="text-sm mb-4 text-slate-800 font-medium">Correct Answer: <span class="font-bold text-slate-900 bg-white px-2 py-1 rounded border border-slate-200 ml-1">${q.correct_answer}</span></p>
-                            <div class="h-px w-full bg-rose-200 mb-3"></div>
-                            <p class="text-[10px] uppercase font-bold text-rose-500 mb-1.5 tracking-wider">Analysis</p>
-                            <p class="text-sm text-rose-800 leading-relaxed">${q.explanation}</p>
+                        <div class="p-4 bg-danger/10 border border-danger/30 rounded-2xl mt-4">
+                            <p class="text-danger font-bold text-sm mb-2">Incorrect</p>
+                            <p class="text-xs mb-3 text-white">Correct: <span class="font-bold text-danger">${q.correct_answer}</span></p>
+                            <p class="text-xs text-danger/80 leading-relaxed">${q.explanation}</p>
                         </div>`;
-                    card.classList.add('border-rose-400', 'ring-4', 'ring-rose-50');
-                    card.classList.remove('border-slate-200');
+                    card.classList.add('border-danger/50');
+                    card.classList.remove('border-borderline');
                 }
             });
             
             if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
                 document.getElementById('quiz-score-area').innerHTML = `
-                    <div class="mt-8 p-8 bg-slate-900 rounded-2xl text-center text-white shadow-xl">
-                        <p class="text-xs font-bold uppercase tracking-widest text-brand-400 mb-2">Final Score</p>
-                        <h3 class="text-5xl font-extrabold text-white mb-3">${score} <span class="text-slate-400 text-3xl">/ ${AppState.quiz.length}</span></h3>
-                        <p class="text-slate-400 text-sm font-medium">Assessment Complete.</p>
+                    <div class="mt-6 p-8 bg-card rounded-3xl text-center border border-borderline">
+                        <p class="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Final Score</p>
+                        <h3 class="text-5xl font-black text-white mb-2">${score} <span class="text-neutral-600 text-3xl">/ ${AppState.quiz.length}</span></h3>
                     </div>
                 `;
             }
