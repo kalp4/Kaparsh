@@ -329,242 +329,565 @@ KAPARSH_FRONTEND = r"""
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#000000">
     <title>Kaparsh</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        dark: '#000000',
-                        card: '#121212',
-                        borderline: '#262626',
-                        blurple: '#5865F2',
-                        famneon: '#00FFA3',
-                        xblue: '#1DA1F2',
-                        danger: '#ED4245'
-                    },
-                    fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Keeping external scripts for critical functionality only -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { background-color: #000; color: #fff; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
-        ::selection { background: transparent; }
-        ::-moz-selection { background: transparent; }
-        input { -webkit-user-select: auto; user-select: auto; }
-        ::-webkit-scrollbar { display: none; }
-        .loader { border-top-color: #00FFA3; animation: spinner 1s linear infinite; }
-        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .nav-active { color: #fff !important; }
-        .nav-active i { color: #5865F2; }
-        .pdf-page { background-color: #000; color: #fff; }
+        /* APPLE VISION-OS / NATIVE iOS DESIGN SYSTEM */
+        
+        :root {
+            --bg-color: #000000;
+            --surface-color: rgba(28, 28, 30, 0.6);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --accent: #5865F2;
+            --accent-glow: rgba(88, 101, 242, 0.4);
+            --success: #32D74B;
+            --danger: #FF453A;
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --text-tertiary: rgba(255, 255, 255, 0.4);
+            --bezier: cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        * {
+            margin: 0; padding: 0; box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+        }
+
+        body, html {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            width: 100%; height: 100%;
+        }
+
+        /* Ambient Liquid Background */
+        .ambient-bg {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: -1; overflow: hidden; pointer-events: none;
+        }
+        .orb {
+            position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15;
+            animation: float 20s infinite alternate ease-in-out;
+        }
+        .orb.blue { width: 60vw; height: 60vw; background: var(--accent); top: -10%; left: -10%; }
+        .orb.green { width: 50vw; height: 50vw; background: var(--success); bottom: -10%; right: -10%; animation-delay: -10s; }
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(15vw, 15vh) scale(1.2); }
+        }
+
+        /* Core Layout */
+        .app-container {
+            max-width: 500px; margin: 0 auto; min-height: 100vh;
+            position: relative; padding-bottom: 120px;
+        }
+        
+        .header {
+            position: sticky; top: 0; z-index: 40; padding: 16px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border-bottom: 0.5px solid var(--surface-border);
+        }
+        .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+
+        .icon-btn {
+            width: 36px; height: 36px; border-radius: 50%; border: none;
+            background: var(--surface-color); color: var(--text-primary);
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 0.5px solid var(--surface-border); cursor: pointer;
+            transition: transform 0.2s var(--bezier);
+        }
+        .icon-btn:active { transform: scale(0.9); }
+
+        /* Typography Hierarchy */
+        .large-title { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; line-height: 1.1; }
+        .sub-title { font-size: 15px; color: var(--text-secondary); line-height: 1.4; font-weight: 400; margin-bottom: 24px; }
+        .section-header { font-size: 20px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+
+        /* Utilities */
+        .hidden { display: none !important; }
+        .flex { display: flex !important; }
+        .tab-pane { padding: 24px; animation: fadeUp 0.6s var(--bezier); }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--surface-color);
+            backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%);
+            border: 0.5px solid var(--surface-border);
+            border-radius: 28px; padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            transition: transform 0.3s var(--bezier), box-shadow 0.3s var(--bezier);
+            position: relative; overflow: hidden;
+        }
+
+        /* Upload Zones */
+        .upload-zone {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px 20px; border-radius: 28px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1.5px dashed rgba(255, 255, 255, 0.15);
+            cursor: pointer; transition: all 0.3s var(--bezier);
+            position: relative; margin-bottom: 24px; text-align: center;
+        }
+        .upload-zone:active { transform: scale(0.98); background: rgba(255, 255, 255, 0.06); }
+        .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 10; }
+        .upload-icons { display: flex; gap: 16px; margin-bottom: 16px; }
+        .upload-icons i { font-size: 28px; }
+        .upload-icons .fa-file-pdf { color: var(--accent); }
+        .upload-icons .fa-image { color: var(--success); }
+        .upload-text { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+
+        /* Primary Button */
+        .btn-primary {
+            width: 100%; padding: 18px; border-radius: 100px;
+            background: linear-gradient(135deg, var(--accent), #4752C4);
+            border: none; color: #fff; font-size: 17px; font-weight: 600;
+            cursor: pointer; transition: all 0.3s var(--bezier);
+            box-shadow: 0 10px 20px var(--accent-glow);
+            display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn-primary:active { transform: scale(0.96); box-shadow: 0 5px 10px var(--accent-glow); }
+        .btn-primary.success-style { background: linear-gradient(135deg, var(--success), #28B43C); color: #000; box-shadow: 0 10px 20px rgba(50, 215, 75, 0.2); }
+
+        /* Native Inputs */
+        .input-group {
+            background: rgba(0,0,0,0.3); border: 0.5px solid var(--surface-border);
+            border-radius: 16px; padding: 14px 20px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+        }
+        .input-group label { font-size: 15px; color: var(--text-secondary); font-weight: 500; }
+        .input-group input { 
+            background: transparent; border: none; outline: none; color: #fff; 
+            font-size: 16px; font-weight: 600; text-align: right; font-family: inherit;
+        }
+        .input-group input[type="date"] { color: var(--success); color-scheme: dark; }
+
+        /* Checkboxes (Syllabus) */
+        .checkbox-list { display: flex; flex-direction: column; gap: 12px; max-height: 250px; overflow-y: auto; margin-bottom: 24px; padding-right: 8px; }
+        .custom-checkbox {
+            display: flex; align-items: center; gap: 16px; padding: 14px 16px;
+            background: rgba(255,255,255,0.03); border: 0.5px solid var(--surface-border);
+            border-radius: 16px; cursor: pointer; transition: 0.2s var(--bezier);
+        }
+        .custom-checkbox input { display: none; }
+        .checker {
+            width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--text-tertiary);
+            display: flex; align-items: center; justify-content: center; transition: 0.2s var(--bezier);
+        }
+        .checker i { font-size: 10px; color: #000; opacity: 0; transform: scale(0.5); transition: 0.2s var(--bezier); }
+        .custom-checkbox input:checked + .checker { background: var(--accent); border-color: var(--accent); }
+        .custom-checkbox input:checked + .checker i { opacity: 1; transform: scale(1); }
+        .checkbox-label { font-size: 15px; font-weight: 500; flex: 1; }
+
+        /* Notes UI */
+        .badge {
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 4px 10px; border-radius: 100px;
+            background: rgba(255, 255, 255, 0.1); color: var(--text-secondary);
+        }
+        .note-card {
+            border-bottom: 0.5px solid var(--surface-border); padding-bottom: 24px; margin-bottom: 24px;
+        }
+        .note-card:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .note-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .note-title { font-size: 19px; font-weight: 600; color: #fff; line-height: 1.3; max-width: 80%; }
+        
+        .def-box {
+            background: rgba(88, 101, 242, 0.1); border-left: 3px solid var(--accent);
+            padding: 12px 16px; border-radius: 0 12px 12px 0; margin-bottom: 12px;
+        }
+        .def-box span { font-weight: 600; color: var(--accent); margin-right: 8px; }
+        .def-box p { font-size: 14px; color: #fff; display: inline; }
+
+        .formula-box {
+            background: rgba(0,0,0,0.4); border: 0.5px solid var(--surface-border);
+            padding: 16px; border-radius: 16px; text-align: center; margin-bottom: 12px;
+        }
+        .formula-box .eq { font-family: ui-monospace, monospace; font-size: 18px; font-weight: 700; color: var(--success); margin-bottom: 4px; }
+        .formula-box .meaning { font-size: 12px; color: var(--text-secondary); }
+
+        .deriv-box {
+            background: rgba(255,255,255,0.02); border: 0.5px solid var(--surface-border);
+            padding: 16px; border-radius: 16px; margin-bottom: 12px;
+        }
+        .deriv-box h5 { font-size: 13px; color: var(--accent); margin-bottom: 8px; font-weight: 600; }
+        .deriv-box pre { font-family: ui-monospace, monospace; font-size: 13px; color: var(--text-secondary); white-space: pre-wrap; }
+
+        .note-list { list-style: none; padding-left: 4px; }
+        .note-list li {
+            position: relative; padding-left: 20px; font-size: 14px; color: var(--text-primary);
+            line-height: 1.5; margin-bottom: 8px;
+        }
+        .note-list li::before {
+            content: ''; position: absolute; left: 0; top: 7px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--success);
+        }
+
+        /* Timeline (Schedule) */
+        .timeline { position: relative; padding-left: 28px; margin-top: 16px; }
+        .timeline::before {
+            content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 1.5px;
+            background: linear-gradient(to bottom, var(--accent) 0%, rgba(255,255,255,0.05) 100%);
+        }
+        .timeline-item { position: relative; margin-bottom: 32px; }
+        .timeline-dot {
+            position: absolute; left: -28px; top: 12px; width: 22px; height: 22px;
+            border-radius: 50%; background: var(--bg-color); border: 2px solid var(--accent);
+            display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+        }
+        .timeline-content {
+            background: var(--surface-color); border: 0.5px solid var(--surface-border);
+            border-radius: 20px; padding: 16px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .tl-date { color: var(--success); font-size: 13px; font-weight: 700; }
+        .tl-hours { color: var(--text-secondary); font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        .tl-focus { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        .tl-topic {
+            background: rgba(0,0,0,0.5); padding: 10px 12px; border-radius: 12px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+        }
+        .tl-topic-name { font-size: 13px; font-weight: 500; }
+        .tl-topic-time { font-size: 11px; color: var(--accent); font-weight: 700; background: rgba(88, 101, 242, 0.15); padding: 4px 8px; border-radius: 6px; }
+        .tl-advice { font-size: 13px; color: var(--text-secondary); margin-top: 12px; padding-left: 10px; border-left: 2px solid var(--surface-border); }
+
+        /* Quiz */
+        .q-card { margin-bottom: 24px; transition: 0.3s var(--bezier); }
+        .q-label { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; margin-bottom: 8px; }
+        .q-text { font-size: 18px; font-weight: 600; line-height: 1.4; margin-bottom: 20px; }
+        
+        .quiz-opt-label {
+            display: block; padding: 16px 20px; margin-bottom: 12px;
+            background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border);
+            border-radius: 16px; font-size: 15px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s var(--bezier); position: relative; overflow: hidden;
+        }
+        .quiz-opt-label input { display: none; }
+        .quiz-opt-label:active { transform: scale(0.98); }
+        .quiz-opt-label:has(input:checked) {
+            background: rgba(88, 101, 242, 0.15); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
+        }
+        .quiz-res-box { padding: 16px; border-radius: 16px; margin-top: 16px; font-size: 14px; line-height: 1.5; }
+        .quiz-res-box.correct { background: rgba(50, 215, 75, 0.1); border: 1px solid rgba(50, 215, 75, 0.3); }
+        .quiz-res-box.wrong { background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.3); }
+
+        /* Chat */
+        .chat-container { display: flex; flex-direction: column; height: calc(100vh - 180px); }
+        .chat-history { flex: 1; overflow-y: auto; padding-bottom: 20px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+        .chat-history::-webkit-scrollbar { display: none; }
+        
+        .chat-bubble { max-width: 85%; padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; animation: bubbleIn 0.3s var(--bezier); }
+        @keyframes bubbleIn { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        
+        .chat-ai {
+            background: var(--surface-color); border: 0.5px solid var(--surface-border);
+            align-self: flex-start; border-bottom-left-radius: 4px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        }
+        .chat-user {
+            background: var(--accent); color: #fff;
+            align-self: flex-end; border-bottom-right-radius: 4px;
+        }
+        .typing-dots { display: flex; gap: 4px; padding: 4px; }
+        .typing-dots span { width: 6px; height: 6px; background: var(--text-secondary); border-radius: 50%; animation: typeDot 1.4s infinite ease-in-out both; }
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typeDot { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+        .chat-input-wrapper {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+            width: 100%; max-width: 460px; padding: 0 16px; z-index: 40;
+        }
+        .chat-input-box {
+            background: rgba(30, 30, 30, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 0.5px solid var(--surface-border); border-radius: 100px;
+            display: flex; align-items: center; padding: 6px 6px 6px 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .chat-input-box input {
+            flex: 1; background: transparent; border: none; outline: none;
+            color: #fff; font-size: 15px; font-family: inherit;
+        }
+        .chat-input-box input::placeholder { color: var(--text-tertiary); }
+        .chat-send-btn {
+            width: 36px; height: 36px; border-radius: 50%; background: var(--accent);
+            border: none; color: #fff; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: 0.2s var(--bezier);
+        }
+        .chat-send-btn:active { transform: scale(0.9); }
+
+        /* Dynamic Island Navigation */
+        .dynamic-island {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.7); backdrop-filter: blur(30px) saturate(200%); -webkit-backdrop-filter: blur(30px) saturate(200%);
+            border: 0.5px solid rgba(255,255,255,0.15); border-radius: 100px;
+            display: flex; padding: 6px; gap: 4px; box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            z-index: 100;
+        }
+        .nav-indicator {
+            position: absolute; top: 6px; left: 6px; width: 44px; height: 44px;
+            background: rgba(255,255,255,0.12); border-radius: 50%;
+            transition: transform 0.4s var(--bezier); z-index: 0; pointer-events: none;
+        }
+        .nav-btn {
+            width: 44px; height: 44px; border-radius: 50%; border: none; background: transparent;
+            color: var(--text-tertiary); display: flex; align-items: center; justify-content: center;
+            font-size: 18px; cursor: pointer; position: relative; z-index: 1;
+            transition: color 0.3s var(--bezier), transform 0.2s var(--bezier);
+        }
+        .nav-btn:active { transform: scale(0.85); }
+        .nav-btn.nav-active { color: #fff; }
+
+        /* Global Loader (VisionOS Style) */
+        .loader-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            display: flex; flex-col; align-items: center; justify-content: center; flex-direction: column;
+            opacity: 0; pointer-events: none; transition: opacity 0.4s var(--bezier);
+        }
+        .loader-overlay.active { opacity: 1; pointer-events: auto; }
+        .spinner {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 0%, var(--accent) 100%);
+            mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+            animation: spin 1s linear infinite; margin-bottom: 24px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .loader-title { font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+        .loader-text { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.4; max-width: 250px; }
+
+        /* Print Override */
+        .pdf-page { background: #000; color: #fff; }
     </style>
 </head>
-<body class="antialiased overflow-x-hidden pb-36 font-sans">
+<body>
 
-    <div class="max-w-md mx-auto min-h-screen bg-dark relative border-x border-borderline shadow-2xl">
+    <div class="ambient-bg">
+        <div class="orb blue"></div>
+        <div class="orb green"></div>
+    </div>
+
+    <!-- Global Loader -->
+    <div id="global-loader" class="loader-overlay hidden">
+        <div class="spinner"></div>
+        <div id="loader-title" class="loader-title">Processing Document...</div>
+        <div id="loader-text" class="loader-text">Please wait. AI is analyzing the data.</div>
+    </div>
+
+    <div class="app-container">
         
-        <header class="sticky top-0 z-40 bg-dark/80 backdrop-blur-md border-b border-borderline px-4 py-3 flex justify-between items-center" data-html2canvas-ignore>
-            <h1 class="text-xl font-bold tracking-tight">Kaparsh</h1>
-            <button id="download-btn" onclick="downloadNotes()" class="hidden w-8 h-8 rounded-full bg-card border border-borderline flex items-center justify-center active:scale-95 transition-transform">
-                <i class="fa-solid fa-arrow-down text-sm"></i>
+        <header class="header" data-html2canvas-ignore>
+            <h1>Kaparsh</h1>
+            <button id="download-btn" onclick="downloadNotes()" class="icon-btn hidden">
+                <i class="fa-solid fa-arrow-down"></i>
             </button>
         </header>
 
-        <main class="w-full">
+        <main style="padding-top: 16px;">
             
-            <div id="global-loader" class="hidden flex-col items-center justify-center pt-32 px-6 text-center">
-                <div class="loader w-10 h-10 border-4 border-card rounded-full mb-6"></div>
-                <p id="loader-title" class="text-base font-bold text-white mb-2">Processing Document...</p>
-                <p id="loader-text" class="text-xs font-semibold text-neutral-400">Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)</p>
-            </div>
-
-            <!-- Tab: Home (Micro Analyzer) -->
-            <div id="tab-home" class="tab-pane block px-4 py-6">
-                <div class="bg-card rounded-3xl p-6 border border-borderline mb-6 relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blurple rounded-full opacity-20 blur-2xl"></div>
-                    <h2 class="text-2xl font-bold mb-1">Chapter Analysis</h2>
-                    <p class="text-xs text-neutral-400">Upload a single textbook chapter or section for deep-extraction notes, formulas, and quizzes.</p>
+            <!-- Tab: Home -->
+            <div id="tab-home" class="tab-pane flex flex-col">
+                <div class="glass-card" style="margin-bottom: 24px; border: none; background: radial-gradient(circle at top left, rgba(88, 101, 242, 0.2), transparent 70%), var(--surface-color);">
+                    <h2 class="large-title">Chapter<br>Analysis</h2>
+                    <p class="sub-title" style="margin-bottom: 0;">Upload a textbook chapter for deep-extraction notes, formulas, and intelligence.</p>
                 </div>
 
-                <label id="drop-zone" for="file-upload" class="bg-card rounded-3xl p-8 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-6 active:bg-neutral-900 transition-colors cursor-pointer relative block overflow-hidden">
-                    <div class="flex items-center gap-3 mb-3 relative z-10 pointer-events-none">
-                        <i class="fa-solid fa-file-pdf text-xl text-blurple"></i>
-                        <i class="fa-solid fa-image text-xl text-famneon"></i>
+                <label id="drop-zone" for="file-upload" class="upload-zone">
+                    <div class="upload-icons">
+                        <i class="fa-solid fa-file-pdf"></i>
+                        <i class="fa-solid fa-image"></i>
                     </div>
-                    <p id="file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Chapter (PDF/Img)</p>
-                    <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                    <div id="file-name" class="upload-text">Tap to Upload File</div>
+                    <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg">
                 </label>
 
-                <button id="analyze-btn" class="w-full bg-famneon text-black font-bold text-base py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(0,255,163,0.3)]">
+                <button id="analyze-btn" class="btn-primary">
                     Generate Intelligence
+                    <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 14px;"></i>
                 </button>
             </div>
 
             <!-- Tab: Notes -->
-            <div id="tab-summary" class="tab-pane hidden px-4 py-6 pdf-page">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-xl font-bold">Notes Feed</h2>
-                    <span id="topic-count" class="text-[10px] font-bold bg-card border border-borderline px-3 py-1 rounded-full text-neutral-400 uppercase tracking-wide"></span>
+            <div id="tab-summary" class="tab-pane hidden pdf-page flex flex-col">
+                <div class="section-header">
+                    <span>Notes Feed</span>
+                    <span id="topic-count" class="badge">0 Topics</span>
                 </div>
-                <div id="topics-grid" class="bg-card rounded-3xl border border-borderline p-6 flex flex-col gap-6 shadow-lg">
-                    <div class="flex flex-col items-center justify-center py-20 text-center opacity-50">
-                        <i class="fa-solid fa-book-open text-4xl mb-4 text-neutral-600"></i>
-                        <p class="text-sm font-medium">Your digital notebook is empty.</p>
+                <div id="topics-grid" class="glass-card" style="padding: 24px 20px;">
+                    <div style="text-align: center; padding: 40px 0; opacity: 0.5;">
+                        <i class="fa-solid fa-layer-group" style="font-size: 32px; margin-bottom: 12px;"></i>
+                        <p style="font-size: 14px; font-weight: 500;">Your digital notebook is empty.</p>
                     </div>
                 </div>
             </div>
 
             <!-- Tab: Schedule -->
-            <div id="tab-schedule" class="tab-pane hidden px-4 py-6">
-                <div id="schedule-setup" class="flex flex-col items-center justify-center py-4 text-center">
-                    <div class="w-16 h-16 bg-card rounded-full flex items-center justify-center mb-3 border border-borderline">
-                        <i class="fa-solid fa-map-location-dot text-2xl text-blurple"></i>
+            <div id="tab-schedule" class="tab-pane hidden flex flex-col">
+                <div id="schedule-setup">
+                    <div style="text-align: center; margin-bottom: 32px;">
+                        <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(88,101,242,0.1); border: 1px solid rgba(88,101,242,0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; color: var(--accent);">
+                            <i class="fa-solid fa-calendar-day"></i>
+                        </div>
+                        <h2 class="large-title" style="font-size: 24px;">Master Planner</h2>
+                        <p class="sub-title" style="margin-bottom: 0;">Set parameters and upload syllabus.</p>
                     </div>
-                    <h3 class="text-lg font-bold mb-1">Master Syllabus Planner</h3>
-                    <p class="text-xs text-neutral-500 mb-5 px-4">Set your timeline parameters, upload your syllabus, and pick your active subjects.</p>
                     
-                    <div class="w-full max-w-sm space-y-3 mb-5">
-                        <div class="bg-card rounded-2xl p-4 border border-borderline flex justify-between items-center">
-                            <label class="text-sm font-semibold text-neutral-300">Exam Date</label>
-                            <input type="date" id="schedule-exam-date" class="bg-transparent text-right text-sm font-bold text-famneon outline-none" style="color-scheme: dark;">
-                        </div>
-                        <div class="bg-card rounded-2xl p-4 border border-borderline flex justify-between items-center">
-                            <label class="text-sm font-semibold text-neutral-300">Daily Hours</label>
-                            <input type="number" id="schedule-study-hours" value="2" min="1" max="16" class="bg-transparent text-right text-sm font-bold text-white outline-none w-16">
-                        </div>
+                    <div class="input-group">
+                        <label>Target Exam Date</label>
+                        <input type="date" id="schedule-exam-date">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 24px;">
+                        <label>Daily Study Hours</label>
+                        <input type="number" id="schedule-study-hours" value="2" min="1" max="16" style="width: 60px;">
                     </div>
 
-                    <label id="syllabus-drop-zone" for="syllabus-upload" class="bg-card w-full max-w-sm rounded-3xl p-5 border border-borderline border-dashed flex flex-col items-center justify-center text-center mb-4 active:bg-neutral-900 transition-colors cursor-pointer relative overflow-hidden">
-                        <div class="flex items-center gap-3 mb-2 relative z-10 pointer-events-none">
-                            <i class="fa-solid fa-file-pdf text-lg text-blurple"></i>
-                            <i class="fa-solid fa-image text-lg text-famneon"></i>
-                        </div>
-                        <p id="syllabus-file-name" class="text-sm font-bold text-white relative z-10 pointer-events-none">Upload Syllabus / Datesheet</p>
-                        <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                    <label id="syllabus-drop-zone" for="syllabus-upload" class="upload-zone" style="padding: 30px 20px;">
+                        <div class="upload-icons" style="margin-bottom: 8px;"><i class="fa-solid fa-book" style="color: var(--accent);"></i></div>
+                        <div id="syllabus-file-name" class="upload-text" style="font-size: 14px;">Upload Syllabus (Optional)</div>
+                        <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg">
                     </label>
 
-                    <div id="subject-selector-area" class="w-full max-w-sm mb-6 hidden">
-                        <p class="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-2 text-left">Select Subjects to Study:</p>
-                        <div id="subject-checkboxes" class="bg-card border border-borderline rounded-2xl p-4 flex flex-col gap-3 max-h-48 overflow-y-auto text-left"></div>
+                    <div id="subject-selector-area" class="hidden" style="margin-bottom: 24px;">
+                        <p style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 12px;">Select Subjects to Study</p>
+                        <div id="subject-checkboxes" class="checkbox-list"></div>
                     </div>
 
-                    <button onclick="generateSchedule()" class="w-full max-w-sm bg-blurple text-white font-bold py-4 rounded-full active:scale-95 transition-transform shadow-[0_0_15px_rgba(88,101,242,0.3)]">
-                        Build Master Plan
-                    </button>
+                    <button onclick="generateSchedule()" class="btn-primary">Build Master Plan</button>
                 </div>
                 
-                <div id="schedule-result" class="hidden flex-col gap-4 relative"></div>
+                <div id="schedule-result" class="hidden flex-col">
+                    <div class="section-header">Timeline</div>
+                    <div class="timeline" id="schedule-timeline-container"></div>
+                </div>
             </div>
 
             <!-- Tab: Quiz -->
-            <div id="tab-quiz" class="tab-pane hidden px-4 py-6">
-                <div id="quiz-setup" class="flex flex-col items-center justify-center py-20 text-center">
-                    <div class="w-20 h-20 bg-card rounded-full flex items-center justify-center mb-4 border border-borderline">
-                        <i class="fa-solid fa-gamepad text-3xl text-famneon"></i>
+            <div id="tab-quiz" class="tab-pane hidden flex flex-col">
+                <div id="quiz-setup" style="text-align: center; padding: 40px 0;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(50, 215, 75, 0.1); border: 1px solid rgba(50, 215, 75, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 32px; color: var(--success);">
+                        <i class="fa-solid fa-gamepad"></i>
                     </div>
-                    <h3 class="text-lg font-bold mb-2">Dynamic Quiz Engine</h3>
-                    <p class="text-sm text-neutral-500 mb-8 px-4">Test your mastery based on the chapter you analyzed.</p>
-                    <button onclick="generateQuiz()" class="bg-blurple text-white font-bold py-3 px-8 rounded-full active:scale-95 transition-transform">
-                        Start Quiz
-                    </button>
+                    <h2 class="large-title" style="font-size: 28px;">Dynamic Quiz</h2>
+                    <p class="sub-title">Test mastery of the analyzed chapter.</p>
+                    <button onclick="generateQuiz()" class="btn-primary success-style" style="margin-top: 16px;">Start Knowledge Check</button>
                 </div>
-                <div id="quiz-result" class="hidden flex-col gap-6">
-                    <div id="quiz-questions-container" class="flex flex-col gap-6"></div>
-                    <button onclick="checkAnswers()" class="w-full bg-famneon text-black font-bold py-4 rounded-full mt-4 active:scale-95 transition-transform">
-                        Submit
-                    </button>
+                <div id="quiz-result" class="hidden flex-col">
+                    <div id="quiz-questions-container"></div>
+                    <button onclick="checkAnswers()" class="btn-primary" style="margin-top: 24px;">Submit Answers</button>
                     <div id="quiz-score-area"></div>
                 </div>
             </div>
 
             <!-- Tab: Doubts -->
-            <div id="tab-doubts" class="tab-pane hidden px-4 py-6 h-full flex flex-col">
-                <h2 class="text-xl font-bold mb-4">Doubts</h2>
-                <div id="chat-history" class="flex-1 overflow-y-auto flex flex-col gap-4 pb-10">
-                    <div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start shadow-sm">
-                        <p class="text-sm text-neutral-200">Ask me anything about your analyzed chapter!</p>
+            <div id="tab-doubts" class="tab-pane hidden">
+                <div class="chat-container">
+                    <div class="section-header" style="margin-bottom: 24px;">Study Assistant</div>
+                    <div id="chat-history" class="chat-history">
+                        <div class="chat-bubble chat-ai">Hi there! Ask me anything about the chapter you just analyzed.</div>
                     </div>
                 </div>
-                <div class="fixed bottom-[88px] left-0 right-0 mx-auto w-full max-w-md px-4 z-40">
-                    <div class="bg-card border border-borderline rounded-full flex items-center p-1 shadow-lg shadow-black">
-                        <input type="text" id="doubt-input" placeholder="Ask a question..." class="flex-1 bg-transparent text-white text-sm px-4 outline-none placeholder-neutral-500">
-                        <button onclick="sendDoubt()" class="w-10 h-10 bg-blurple rounded-full flex items-center justify-center text-white active:scale-95 transition-transform shrink-0">
-                            <i class="fa-solid fa-arrow-up"></i>
-                        </button>
+                <div class="chat-input-wrapper" data-html2canvas-ignore>
+                    <div class="chat-input-box">
+                        <input type="text" id="doubt-input" placeholder="Message Kaparsh...">
+                        <button onclick="sendDoubt()" class="chat-send-btn"><i class="fa-solid fa-arrow-up"></i></button>
                     </div>
                 </div>
             </div>
         </main>
 
-        <nav class="fixed bottom-0 w-full max-w-md bg-dark/95 backdrop-blur-xl border-t border-borderline flex justify-around items-center pb-6 pt-3 z-50">
-            <button class="nav-btn active text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-home">
-                <i class="fa-solid fa-house text-[22px]"></i>
-                <span class="text-[10px] font-medium">Home</span>
-            </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-summary">
-                <i class="fa-solid fa-layer-group text-[22px]"></i>
-                <span class="text-[10px] font-medium">Notes</span>
-            </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-schedule">
-                <i class="fa-solid fa-calendar-day text-[22px]"></i>
-                <span class="text-[10px] font-medium">Plan</span>
-            </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-quiz">
-                <i class="fa-solid fa-gamepad text-[22px]"></i>
-                <span class="text-[10px] font-medium">Quiz</span>
-            </button>
-            <button class="nav-btn text-neutral-500 flex flex-col items-center gap-1 w-14" data-target="tab-doubts">
-                <i class="fa-solid fa-comment-dots text-[22px]"></i>
-                <span class="text-[10px] font-medium">Doubts</span>
-            </button>
+        <!-- Navigation (Dynamic Island) -->
+        <nav class="dynamic-island" data-html2canvas-ignore>
+            <div class="nav-indicator" id="nav-indicator"></div>
+            <button class="nav-btn nav-active" data-target="tab-home" onclick="switchTab('tab-home', 0)"><i class="fa-solid fa-house"></i></button>
+            <button class="nav-btn" data-target="tab-summary" onclick="switchTab('tab-summary', 1)"><i class="fa-solid fa-layer-group"></i></button>
+            <button class="nav-btn" data-target="tab-schedule" onclick="switchTab('tab-schedule', 2)"><i class="fa-solid fa-calendar-day"></i></button>
+            <button class="nav-btn" data-target="tab-quiz" onclick="switchTab('tab-quiz', 3)"><i class="fa-solid fa-gamepad"></i></button>
+            <button class="nav-btn" data-target="tab-doubts" onclick="switchTab('tab-doubts', 4)"><i class="fa-solid fa-comment-dots"></i></button>
         </nav>
 
     </div>
 
     <script>
         const AppState = {
-            extractedText: "",
-            topics: null,
-            schedule: null,
-            quiz: null,
-            file: null,
-            syllabusFile: null,
-            syllabusContextText: "",
-            globalBannedTerms: [] 
+            extractedText: "", topics: null, schedule: null, quiz: null,
+            file: null, syllabusFile: null, syllabusContextText: "", globalBannedTerms: [] 
         };
 
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 14);
         document.getElementById('schedule-exam-date').valueAsDate = tomorrow;
 
+        // UI Logic
+        const navBtns = document.querySelectorAll('.nav-btn');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        const indicator = document.getElementById('nav-indicator');
+
+        function switchTab(targetId, index) {
+            if (targetId === 'tab-summary' || targetId === 'tab-quiz' || targetId === 'tab-doubts') {
+                if (!AppState.topics) return alert("Upload and analyze a Chapter first!");
+            }
+            
+            navBtns.forEach(btn => btn.classList.remove('nav-active'));
+            navBtns[index].classList.add('nav-active');
+            indicator.style.transform = `translateX(${index * 48}px)`;
+
+            tabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('flex'); });
+            const target = document.getElementById(targetId);
+            target.classList.remove('hidden');
+            target.classList.add('flex');
+            window.scrollTo(0, 0);
+        }
+
+        const toggleLoader = (show, title = 'Processing Document...', text = 'Please wait. AI is analyzing the data.') => {
+            document.getElementById('loader-title').innerText = title;
+            document.getElementById('loader-text').innerText = text;
+            const loader = document.getElementById('global-loader');
+            
+            if (show) {
+                loader.classList.remove('hidden');
+                // Small delay to allow CSS block rendering before active class
+                setTimeout(() => loader.classList.add('active'), 10);
+            } else {
+                loader.classList.remove('active');
+                setTimeout(() => loader.classList.add('hidden'), 400); // Wait for transition
+            }
+        };
+
+        const showError = (msg) => {
+            alert("Error: " + msg);
+            toggleLoader(false);
+            switchTab('tab-home', 0);
+        };
+
+        // File Handlers
         const fileInput = document.getElementById('file-upload');
         const fileNameDisplay = document.getElementById('file-name');
-
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
-                fileNameDisplay.classList.add('text-famneon');
+                fileNameDisplay.style.color = 'var(--accent)';
             }
         });
         
         const syllabusInput = document.getElementById('syllabus-upload');
         const syllabusNameDisplay = document.getElementById('syllabus-file-name');
-        
         syllabusInput.addEventListener('change', async () => {
             if (syllabusInput.files.length > 0) {
                 AppState.syllabusFile = syllabusInput.files[0];
                 syllabusNameDisplay.textContent = AppState.syllabusFile.name;
-                syllabusNameDisplay.classList.add('text-blurple');
-                
+                syllabusNameDisplay.style.color = 'var(--success)';
                 await parseSyllabusSubjects();
             }
         });
@@ -595,55 +918,15 @@ KAPARSH_FRONTEND = r"""
             if (!subjects || subjects.length === 0) return;
 
             container.innerHTML = subjects.map((sub) => `
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="syllabus-subject" value="${sub}" checked class="w-4 h-4 accent-blurple rounded bg-dark border-borderline">
-                    <span class="text-xs text-neutral-200 font-medium">${sub}</span>
+                <label class="custom-checkbox">
+                    <input type="checkbox" name="syllabus-subject" value="${sub}" checked>
+                    <div class="checker"><i class="fa-solid fa-check"></i></div>
+                    <span class="checkbox-label">${sub}</span>
                 </label>
             `).join('');
             
             area.classList.remove('hidden');
         }
-
-        const navBtns = document.querySelectorAll('.nav-btn');
-        const tabPanes = document.querySelectorAll('.tab-pane');
-
-        function switchTab(targetId) {
-            navBtns.forEach(btn => btn.classList.remove('nav-active'));
-            document.querySelector(`.nav-btn[data-target="${targetId}"]`).classList.add('nav-active');
-            tabPanes.forEach(pane => pane.classList.add('hidden'));
-            document.getElementById(targetId).classList.remove('hidden');
-            window.scrollTo(0, 0);
-        }
-
-        navBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.dataset.target;
-                if (target === 'tab-summary' || target === 'tab-quiz' || target === 'tab-doubts') {
-                    if (!AppState.topics) return alert("Upload and analyze a Chapter first!");
-                }
-                switchTab(target);
-            });
-        });
-
-        const toggleLoader = (show, title = 'Processing Document...', text = 'Please wait. AI is analyzing the data.<br>(This may take up to 30 seconds)') => {
-            document.getElementById('loader-title').innerText = title;
-            document.getElementById('loader-text').innerHTML = text;
-            
-            if (show) {
-                tabPanes.forEach(pane => pane.classList.add('hidden'));
-                document.getElementById('global-loader').classList.remove('hidden');
-                document.getElementById('global-loader').classList.add('flex');
-            } else {
-                document.getElementById('global-loader').classList.add('hidden');
-                document.getElementById('global-loader').classList.remove('flex');
-            }
-        };
-
-        const showError = (msg) => {
-            alert("Error: " + msg);
-            toggleLoader(false);
-            switchTab('tab-home');
-        };
 
         // Micro-Analyzer
         document.getElementById('analyze-btn').addEventListener('click', async () => {
@@ -670,16 +953,17 @@ KAPARSH_FRONTEND = r"""
                 AppState.topics = data.topics.map(t => ({ title: t.title, loaded: false }));
                 
                 renderTopics();
-                switchTab('tab-summary');
+                switchTab('tab-summary', 1);
                 toggleLoader(false);
                 
                 for (let i = 0; i < AppState.topics.length; i++) {
                     await fetchTopicDetails(i);
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 800));
                 }
 
                 AppState.quiz = null;
                 document.getElementById('quiz-result').classList.add('hidden');
+                document.getElementById('quiz-result').classList.remove('flex');
                 document.getElementById('quiz-setup').classList.remove('hidden');
 
             } catch (err) { showError(err.message); }
@@ -719,53 +1003,53 @@ KAPARSH_FRONTEND = r"""
             grid.innerHTML = AppState.topics.map((t) => {
                 if (!t.loaded) {
                     return `
-                    <div class="border-b border-borderline pb-6 mb-6 opacity-50 animate-pulse">
-                        <div class="h-5 bg-borderline rounded w-2/3 mb-3"></div>
-                        <div class="h-3 bg-borderline rounded w-3/4 mb-2"></div>
+                    <div class="note-card" style="opacity: 0.5; animation: fadeUp 1s infinite alternate;">
+                        <div style="height: 20px; background: var(--surface-border); border-radius: 4px; width: 60%; margin-bottom: 12px;"></div>
+                        <div style="height: 12px; background: var(--surface-border); border-radius: 4px; width: 80%;"></div>
                     </div>`;
                 }
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div style="margin-top: 16px;">
                         ${t.definitions.map(d => `
-                            <div class="bg-blurple/10 border-l-2 border-blurple p-3 rounded-r-xl">
-                                <p class="text-sm text-white"><strong class="text-blurple font-bold mr-2">${d.term}:</strong>${d.definition}</p>
+                            <div class="def-box">
+                                <span>${d.term}:</span><p>${d.definition}</p>
                             </div>
                         `).join('')}
                     </div>` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div style="margin-top: 16px;">
                         ${t.formulas.map(f => `
-                            <div class="bg-famneon/5 border border-famneon/20 p-4 rounded-xl flex flex-col items-center">
-                                <p class="font-mono text-lg font-bold text-famneon">${f.equation}</p>
-                                <p class="text-xs text-white font-medium mt-1">${f.meaning}</p>
+                            <div class="formula-box">
+                                <div class="eq">${f.equation}</div>
+                                <div class="meaning">${f.meaning}</div>
                             </div>
                         `).join('')}
                     </div>` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
-                    <div class="mt-4 space-y-2">
+                    <div style="margin-top: 16px;">
                         ${t.derivations.map(d => `
-                            <div class="bg-dark border border-xblue/30 p-4 rounded-xl">
-                                <p class="text-sm font-bold text-xblue mb-1">${d.title}</p>
-                                <p class="font-mono text-xs text-white leading-relaxed whitespace-pre-wrap">${d.content}</p>
+                            <div class="deriv-box">
+                                <h5>${d.title}</h5>
+                                <pre>${d.content}</pre>
                             </div>
                         `).join('')}
                     </div>` : '';
 
-                const notesList = (t.notes || []).map(n => `<li class="mb-2 flex items-start text-sm text-white"><span class="text-famneon mr-2 mt-1 text-[10px]"><i class="fa-solid fa-circle"></i></span>${n}</li>`).join('');
+                const notesList = (t.notes || []).map(n => `<li>${n}</li>`).join('');
 
                 return `
-                <div class="border-b border-borderline pb-6 mb-2 last:border-0 last:mb-0 last:pb-0">
-                    <div class="flex justify-between items-start mb-3">
-                        <h4 class="font-bold text-lg text-white leading-tight pr-3">${t.title}</h4>
-                        <span class="text-[10px] font-bold px-2 py-1 rounded bg-dark border border-borderline text-neutral-400 uppercase tracking-widest">${t.priority || 'MED'}</span>
+                <div class="note-card">
+                    <div class="note-header">
+                        <div class="note-title">${t.title}</div>
+                        <div class="badge">${t.priority || 'MED'}</div>
                     </div>
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
-                    <ul class="mt-4 space-y-1">${notesList}</ul>
+                    ${notesList ? `<ul class="note-list" style="margin-top:16px;">${notesList}</ul>` : ''}
                 </div>`;
             }).join('');
         }
@@ -782,25 +1066,22 @@ KAPARSH_FRONTEND = r"""
             html2pdf().set(opt).from(element).save();
         }
 
-        // Macro-Planner Logic
+        // Schedule Logic
         async function generateSchedule() {
             const examDate = document.getElementById('schedule-exam-date').value;
             const studyHours = document.getElementById('schedule-study-hours').value;
             
-            if (!examDate) {
-                return alert("Please set your Exam Date in the Plan tab first.");
-            }
+            if (!examDate) return alert("Please set your Exam Date first.");
 
             const selectedSubjects = [];
             document.querySelectorAll('input[name="syllabus-subject"]:checked').forEach(cb => {
                 selectedSubjects.push(cb.value);
             });
 
-            toggleLoader(true, 'Building Master Plan...', 'Mapping out your timeline based on your selected subjects...');
+            toggleLoader(true, 'Building Master Plan...', 'Mapping out timeline based on selection...');
 
             try {
                 let response;
-                
                 if (AppState.syllabusFile) {
                     response = await fetch('/api/schedule', {
                         method: 'POST',
@@ -812,8 +1093,7 @@ KAPARSH_FRONTEND = r"""
                             selected_subjects: selectedSubjects
                         })
                     });
-                } 
-                else if (AppState.topics && AppState.topics.length > 0) {
+                } else if (AppState.topics && AppState.topics.length > 0) {
                     const loadedTopics = AppState.topics.filter(t => t.loaded);
                     response = await fetch('/api/schedule', {
                         method: 'POST',
@@ -821,7 +1101,7 @@ KAPARSH_FRONTEND = r"""
                         body: JSON.stringify({ topics: loadedTopics, exam_date: examDate, study_hours: parseFloat(studyHours) })
                     });
                 } else {
-                    throw new Error("Please upload a Master Syllabus OR analyze a Chapter on the Home tab first.");
+                    throw new Error("Please upload a Syllabus OR analyze a Chapter first.");
                 }
 
                 const rawText = await response.text();
@@ -842,38 +1122,35 @@ KAPARSH_FRONTEND = r"""
         }
 
         function renderSchedule() {
-            const container = document.getElementById('schedule-result');
-            if (!AppState.schedule || !Array.isArray(AppState.schedule)) {
-                return alert("Invalid schedule data received.");
-            }
+            const container = document.getElementById('schedule-timeline-container');
+            if (!AppState.schedule || !Array.isArray(AppState.schedule)) return alert("Invalid schedule data received.");
             
             container.innerHTML = AppState.schedule.map((day) => `
-                <div class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-borderline before:to-transparent">
-                    <div class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-card text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
-                        <span class="text-xs font-bold">${day.day || '-'}</span>
-                    </div>
-                    <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-5 rounded-2xl border border-borderline z-10">
-                        <div class="flex justify-between items-start mb-1">
-                            <span class="text-famneon text-xs font-bold">${(day.date || '').split('-').slice(1).join('/')}</span>
-                            <span class="text-neutral-500 text-[10px] font-bold"><i class="fa-regular fa-clock"></i> ${day.total_hours_today || 0}h</span>
+                <div class="timeline-item">
+                    <div class="timeline-dot">${day.day || '-'}</div>
+                    <div class="timeline-content">
+                        <div class="tl-header">
+                            <span class="tl-date">${(day.date || '').split('-').slice(1).join('/') || 'Day'}</span>
+                            <span class="tl-hours"><i class="fa-regular fa-clock"></i> ${day.total_hours_today || 0}h</span>
                         </div>
-                        <h4 class="font-bold text-white text-sm mb-3">${day.focus_area || 'Study Block'}</h4>
-                        <div class="flex flex-col gap-2 mb-4">
+                        <div class="tl-focus">${day.focus_area || 'Study Block'}</div>
+                        <div>
                             ${(day.topics || []).map(t => `
-                                <div class="flex justify-between items-center bg-dark p-2 rounded-xl border border-borderline">
-                                    <span class="text-xs text-neutral-300 font-medium truncate pr-2">${t.name || 'Topic'}</span>
-                                    <span class="text-[10px] text-blurple font-bold whitespace-nowrap bg-blurple/10 px-2 py-1 rounded">${t.estimated_minutes || 30} min</span>
+                                <div class="tl-topic">
+                                    <span class="tl-topic-name">${t.name || 'Topic'}</span>
+                                    <span class="tl-topic-time">${t.estimated_minutes || 30} min</span>
                                 </div>
                             `).join('')}
                         </div>
-                        <p class="text-xs text-neutral-400 leading-relaxed border-l-2 border-borderline pl-2">${day.actionable_advice || ''}</p>
+                        ${day.actionable_advice ? `<div class="tl-advice">${day.actionable_advice}</div>` : ''}
                     </div>
                 </div>
             `).join('');
         }
 
+        // Quiz Logic
         async function generateQuiz() {
-            toggleLoader(true, 'Generating Exam...', 'Building difficult multiple-choice questions based on your material.');
+            toggleLoader(true, 'Generating Exam...', 'Building adaptive questions...');
             const loadedTopics = AppState.topics.filter(t => t.loaded);
 
             try {
@@ -903,18 +1180,18 @@ KAPARSH_FRONTEND = r"""
             document.getElementById('quiz-score-area').innerHTML = ''; 
 
             container.innerHTML = AppState.quiz.map((q, index) => `
-                <div id="qcard-${index}" class="bg-card p-6 rounded-3xl border border-borderline">
-                    <p class="text-blurple font-bold text-xs mb-2">QUESTION ${index + 1}</p>
-                    <h4 class="font-bold text-base mb-5 text-white leading-relaxed">${q.question || 'Missing question'}</h4>
-                    <div class="space-y-3">
+                <div id="qcard-${index}" class="glass-card q-card">
+                    <div class="q-label">QUESTION ${index + 1}</div>
+                    <div class="q-text">${q.question || 'Missing question'}</div>
+                    <div>
                         ${(q.options || []).map(opt => `
-                            <label class="flex items-center gap-3 cursor-pointer p-4 rounded-2xl border border-borderline bg-dark active:bg-neutral-900 transition-colors">
-                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}" class="w-5 h-5 accent-blurple bg-dark border-borderline">
-                                <span class="text-sm text-neutral-200 font-medium">${opt}</span>
+                            <label class="quiz-opt-label">
+                                <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}">
+                                <span>${opt}</span>
                             </label>
                         `).join('')}
                     </div>
-                    <div id="result-${index}" class="mt-4"></div>
+                    <div id="result-${index}"></div>
                 </div>
             `).join('');
         }
@@ -927,41 +1204,40 @@ KAPARSH_FRONTEND = r"""
                 const card = document.getElementById(`qcard-${index}`);
                 
                 if (!selected) {
-                    resultDiv.innerHTML = `<div class="text-sm text-danger font-bold py-2"><i class="fa-solid fa-circle-exclamation mr-1"></i> Answer required</div>`;
+                    resultDiv.innerHTML = `<div style="color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 12px;"><i class="fa-solid fa-circle-exclamation"></i> Answer required</div>`;
                     return;
                 }
                 
                 if (selected.value === q.correct_answer) {
                     score++;
                     resultDiv.innerHTML = `
-                        <div class="p-4 bg-famneon/10 border border-famneon/30 rounded-2xl mt-4">
-                            <p class="text-famneon font-bold text-sm mb-1">Correct</p>
-                            <p class="text-xs text-famneon/80 leading-relaxed">${q.explanation}</p>
+                        <div class="quiz-res-box correct">
+                            <strong style="color: var(--success); display: block; margin-bottom: 4px;">Correct</strong>
+                            <span style="color: rgba(255,255,255,0.8);">${q.explanation}</span>
                         </div>`;
-                    card.classList.add('border-famneon/50');
-                    card.classList.remove('border-borderline');
+                    card.style.borderColor = 'rgba(50, 215, 75, 0.4)';
                 } else {
                     resultDiv.innerHTML = `
-                        <div class="p-4 bg-danger/10 border border-danger/30 rounded-2xl mt-4">
-                            <p class="text-danger font-bold text-sm mb-2">Incorrect</p>
-                            <p class="text-xs mb-3 text-white">Correct: <span class="font-bold text-danger">${q.correct_answer}</span></p>
-                            <p class="text-xs text-danger/80 leading-relaxed">${q.explanation}</p>
+                        <div class="quiz-res-box wrong">
+                            <strong style="color: var(--danger); display: block; margin-bottom: 4px;">Incorrect</strong>
+                            <div style="font-size: 12px; margin-bottom: 6px;">Correct: <strong>${q.correct_answer}</strong></div>
+                            <span style="color: rgba(255,255,255,0.8);">${q.explanation}</span>
                         </div>`;
-                    card.classList.add('border-danger/50');
-                    card.classList.remove('border-borderline');
+                    card.style.borderColor = 'rgba(255, 69, 58, 0.4)';
                 }
             });
             
             if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
                 document.getElementById('quiz-score-area').innerHTML = `
-                    <div class="mt-6 p-8 bg-card rounded-3xl text-center border border-borderline">
-                        <p class="text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Final Score</p>
-                        <h3 class="text-5xl font-black text-white mb-2">${score} <span class="text-neutral-600 text-3xl">/ ${AppState.quiz.length}</span></h3>
+                    <div class="glass-card" style="text-align: center; margin-top: 24px; padding: 40px 20px;">
+                        <p style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Final Score</p>
+                        <div style="font-size: 48px; font-weight: 800; color: #fff; line-height: 1;">${score} <span style="font-size: 24px; color: var(--text-tertiary);">/ ${AppState.quiz.length}</span></div>
                     </div>
                 `;
             }
         }
 
+        // Chat Logic
         document.getElementById('doubt-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') sendDoubt();
         });
@@ -973,18 +1249,19 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.extractedText) return alert("Please upload and process a Chapter first to ask doubts.");
 
             const chatHistory = document.getElementById('chat-history');
-            chatHistory.innerHTML += `<div class="bg-blurple text-white p-4 rounded-2xl rounded-tr-sm max-w-[85%] self-end shadow-md"><p class="text-sm">${question}</p></div>`;
+            chatHistory.innerHTML += `<div class="chat-bubble chat-user">${question}</div>`;
             input.value = '';
-            window.scrollTo(0, document.body.scrollHeight);
+            
+            // Scroll to bottom
+            const container = document.querySelector('.chat-container');
+            chatHistory.scrollTop = chatHistory.scrollHeight;
 
             const loaderId = 'loader-' + Date.now();
             chatHistory.innerHTML += `
-                <div id="${loaderId}" class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[85%] self-start flex items-center gap-1.5 shadow-sm">
-                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce"></div>
-                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-2 h-2 bg-neutral-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                <div id="${loaderId}" class="chat-bubble chat-ai" style="padding: 16px;">
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
                 </div>`;
-            window.scrollTo(0, document.body.scrollHeight);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
 
             try {
                 const response = await fetch('/api/doubt', {
@@ -999,8 +1276,8 @@ KAPARSH_FRONTEND = r"""
                 if (!response.ok) throw new Error(data.detail || "Server Error");
                 
                 const formattedAnswer = data.answer.replace(/\n/g, '<br>');
-                chatHistory.innerHTML += `<div class="bg-card p-4 rounded-2xl rounded-tl-sm border border-borderline max-w-[90%] self-start shadow-sm"><p class="text-sm text-neutral-200 leading-relaxed">${formattedAnswer}</p></div>`;
-                window.scrollTo(0, document.body.scrollHeight);
+                chatHistory.innerHTML += `<div class="chat-bubble chat-ai">${formattedAnswer}</div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
             } catch (err) {
                 document.getElementById(loaderId).remove();
                 alert("Error: " + err.message);
