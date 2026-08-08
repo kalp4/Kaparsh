@@ -321,7 +321,7 @@ def answer_doubt():
 
 
 # ==============================================================================
-# KAPARSH INTELLIGENCE - FULL STACK WEB UI (VIBRANT & RESPONSIVE)
+# KAPARSH INTELLIGENCE - FULL STACK WEB UI (COLOR MORPHING AMBIENT)
 # ==============================================================================
 
 KAPARSH_FRONTEND = r"""
@@ -385,38 +385,59 @@ KAPARSH_FRONTEND = r"""
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-        /* RADIAL AMBIENT BACKGROUND: 
-         * Guaranteed hardware-agnostic rendering. No filters to clip/fail. 
+        /* RADIAL AMBIENT BACKGROUND WITH DYNAMIC COLOR MORPHING: 
+         * Guaranteed hardware-agnostic rendering. No blurs to clip/fail. 
+         * Combines dynamic drift coordinates with infinite hue-rotation.
          */
         .ambient-bg {
             position: fixed; inset: 0; z-index: 1; 
-            pointer-events: none; overflow: hidden;
+            pointer-events: none; overflow: hidden; background: #000;
         }
         .orb {
             position: absolute; border-radius: 50%; opacity: 0.6;
-            animation: drift 30s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
             mix-blend-mode: screen;
         }
+        
         .orb.one { 
             width: 120vw; height: 120vw; max-width: 1200px;
             background: radial-gradient(circle, rgba(99, 102, 241, 0.45) 0%, rgba(99, 102, 241, 0) 70%); 
             top: -30%; left: -20%; 
+            animation: drift-1 30s infinite alternate ease-in-out, hue-shift 20s infinite linear;
         }
         .orb.two { 
             width: 100vw; height: 100vw; max-width: 1000px;
             background: radial-gradient(circle, rgba(236, 72, 153, 0.35) 0%, rgba(236, 72, 153, 0) 70%); 
-            bottom: -20%; right: -20%; animation-delay: -10s; 
+            bottom: -20%; right: -20%; 
+            animation: drift-2 25s infinite alternate ease-in-out, hue-shift 35s infinite linear reverse;
         }
         .orb.three { 
             width: 90vw; height: 90vw; max-width: 900px;
             background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, rgba(14, 165, 233, 0) 70%); 
-            top: 20%; left: 30%; animation-delay: -15s; 
+            top: 20%; left: 30%; 
+            animation: drift-3 35s infinite alternate ease-in-out, hue-shift 25s infinite linear;
+        }
+
+        /* Color Shifting Layer */
+        @keyframes hue-shift {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(360deg); }
         }
         
-        @keyframes drift {
+        /* Unique Spatial Trajectories */
+        @keyframes drift-1 {
             0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(10vw, 15vh) scale(1.1); }
-            100% { transform: translate(-5vw, 5vh) scale(1); }
+            50% { transform: translate(12vw, 15vh) scale(1.1); }
+            100% { transform: translate(-8vw, 10vh) scale(0.95); }
+        }
+        @keyframes drift-2 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-15vw, -12vh) scale(1.05); }
+            100% { transform: translate(5vw, -18vh) scale(1.1); }
+        }
+        @keyframes drift-3 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(18vw, -15vh) scale(1.15); }
+            100% { transform: translate(-10vw, 20vh) scale(0.9); }
         }
 
         /* Elevating content physically above background */
