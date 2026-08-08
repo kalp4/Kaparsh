@@ -322,6 +322,7 @@ def answer_doubt():
 
 # ==============================================================================
 # MOBILE NATIVE UI INJECTION (OPTIMIZED FOR 6.7" SMARTPHONES)
+# PREMIUM APPLE / GEMINI VIBRANT EXPRESSIVE DESIGN
 # ==============================================================================
 
 KAPARSH_FRONTEND = r"""
@@ -330,7 +331,7 @@ KAPARSH_FRONTEND = r"""
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000">
+    <meta name="theme-color" content="#0A0A0F">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Kaparsh</title>
@@ -338,25 +339,30 @@ KAPARSH_FRONTEND = r"""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
-    <!-- Added libraries to fix Markdown (**, lists, code) and LaTeX (Math equations $$...$$) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 
     <style>
-        /* APPLE HIG / iOS 18 SMARTPHONE DESIGN SYSTEM */
+        /* APPLE HIG / GEMINI VIBRANT PREMIUM DESIGN SYSTEM */
         :root {
-            --bg-color: #000000;
-            --surface-color: rgba(28, 28, 30, 0.6);
+            --bg-color: #0A0A0F; /* Deep premium charcoal/blue instead of #000 */
+            --surface-color: rgba(255, 255, 255, 0.04);
             --surface-border: rgba(255, 255, 255, 0.1);
-            --accent: #5E5CE6; /* iOS Indigo */
-            --accent-glow: rgba(94, 92, 230, 0.4);
-            --success: #32D74B;
-            --danger: #FF453A;
+            
+            /* Vibrant gradients and glowing accents */
+            --accent: #7C3AED; 
+            --accent-grad: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%);
+            --accent-glow: rgba(124, 58, 237, 0.4);
+            --success: #10B981;
+            --success-grad: linear-gradient(135deg, #059669 0%, #10B981 100%);
+            --danger: #F43F5E;
+            
+            /* Brighter, warmer typography */
             --text-primary: #FFFFFF;
-            --text-secondary: rgba(235, 235, 245, 0.6);
-            --text-tertiary: rgba(235, 235, 245, 0.3);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-tertiary: rgba(255, 255, 255, 0.4);
             --bezier: cubic-bezier(0.25, 1, 0.5, 1);
         }
 
@@ -378,21 +384,25 @@ KAPARSH_FRONTEND = r"""
         ::-webkit-scrollbar { display: none; }
         * { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Liquid Background Orbs */
+        /* Expressive, Vivid Liquid Background Orbs (Gemini/Siri Style) */
         .ambient-bg {
             position: fixed; inset: 0; z-index: -1;
             overflow: hidden; pointer-events: none;
+            background: var(--bg-color);
         }
         .orb {
-            position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.15;
-            animation: float 15s infinite alternate ease-in-out;
+            position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.4;
+            animation: float 20s infinite alternate ease-in-out;
+            mix-blend-mode: screen;
         }
-        .orb.blue { width: 70vw; height: 70vw; background: var(--accent); top: -10%; left: -20%; }
-        .orb.green { width: 60vw; height: 60vw; background: var(--success); bottom: 10%; right: -20%; animation-delay: -7s; }
+        .orb.one { width: 85vw; height: 85vw; background: #4F46E5; top: -15%; left: -25%; } /* Indigo */
+        .orb.two { width: 75vw; height: 75vw; background: #EC4899; bottom: -5%; right: -25%; animation-delay: -6s; } /* Magenta/Pink */
+        .orb.three { width: 65vw; height: 65vw; background: #06B6D4; top: 35%; left: 35%; animation-delay: -12s; opacity: 0.35; } /* Cyan */
         
         @keyframes float {
             0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(10vw, 15vh) scale(1.1); }
+            50% { transform: translate(15vw, 15vh) scale(1.15); }
+            100% { transform: translate(-10vw, 20vh) scale(1.05); }
         }
 
         /* Mobile Container Layout constraints for 6.7" */
@@ -411,24 +421,26 @@ KAPARSH_FRONTEND = r"""
             position: sticky; top: env(safe-area-inset-top); z-index: 40;
             padding: 12px 0; margin-bottom: 12px;
             display: flex; justify-content: space-between; align-items: center;
-            background: var(--bg-color);
+            background: transparent;
         }
-        .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .header h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; 
+                     background: linear-gradient(135deg, #FFF, #E0E0E0);
+                     -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
         .icon-btn {
-            width: 32px; height: 32px; border-radius: 50%; border: none;
-            background: var(--surface-color); color: var(--text-primary);
-            display: flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; border-radius: 50%; border: none;
+            background: rgba(255, 255, 255, 0.08); color: var(--text-primary);
+            display: flex; align-items: center; justify-content: center; font-size: 14px;
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-            border: 0.5px solid var(--surface-border); cursor: pointer;
-            transition: transform 0.2s var(--bezier);
+            border: 1px solid rgba(255,255,255,0.12); cursor: pointer;
+            transition: all 0.2s var(--bezier); box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
-        .icon-btn:active { transform: scale(0.9); }
+        .icon-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.15); }
 
         /* Typography */
-        .large-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; line-height: 1.2; }
+        .large-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; line-height: 1.2; }
         .sub-title { font-size: 15px; color: var(--text-secondary); line-height: 1.4; font-weight: 400; margin-bottom: 20px; }
-        .section-header { font-size: 18px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+        .section-header { font-size: 18px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; color: #FFF; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
 
         /* Utilities */
         .hidden { display: none !important; }
@@ -440,13 +452,13 @@ KAPARSH_FRONTEND = r"""
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Glass Cards */
+        /* Vivid Glass Cards */
         .glass-card {
-            background: var(--surface-color);
-            backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border: 0.5px solid var(--surface-border);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+            backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
+            border: 1px solid var(--surface-border);
             border-radius: 24px; padding: 20px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            box-shadow: 0 16px 40px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
             margin-bottom: 16px; position: relative; overflow: hidden;
         }
 
@@ -454,263 +466,286 @@ KAPARSH_FRONTEND = r"""
         .upload-zone {
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding: 32px 16px; border-radius: 24px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1.5px dashed rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1.5px dashed rgba(255, 255, 255, 0.2);
             cursor: pointer; transition: all 0.2s var(--bezier);
             text-align: center; margin-bottom: 20px;
         }
-        .upload-zone:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.08); }
+        .upload-zone:active, .upload-zone:hover { 
+            transform: scale(0.97); 
+            background: rgba(255, 255, 255, 0.08); 
+            border-color: rgba(255, 255, 255, 0.4); 
+            box-shadow: 0 0 20px rgba(255,255,255,0.05);
+        }
         .upload-zone input[type="file"] { position: absolute; opacity: 0; width: 0; height: 0; }
         .upload-icons { display: flex; gap: 12px; margin-bottom: 12px; }
-        .upload-icons i { font-size: 24px; }
-        .upload-text { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .upload-icons i { font-size: 26px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); }
+        .upload-text { font-size: 15px; font-weight: 600; color: #FFF; }
 
-        /* Primary Button */
+        /* Premium Radiant Button */
         .btn-primary {
             width: 100%; padding: 16px; border-radius: 16px;
-            background: var(--accent); color: #fff;
-            border: none; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;
+            background: var(--accent-grad); color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            border: 1px solid rgba(255,255,255,0.1); font-size: 16px; font-weight: 600; letter-spacing: 0.3px;
             cursor: pointer; transition: all 0.2s var(--bezier);
-            box-shadow: 0 8px 16px var(--accent-glow);
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.35), inset 0 1px 1px rgba(255,255,255,0.2);
             display: flex; justify-content: center; align-items: center; gap: 8px;
         }
-        .btn-primary:active { transform: scale(0.95); opacity: 0.9; box-shadow: 0 4px 8px var(--accent-glow); }
-        .btn-success { background: var(--success); color: #000; box-shadow: 0 8px 16px rgba(50, 215, 75, 0.25); }
+        .btn-primary:active { transform: scale(0.96); opacity: 0.9; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3); }
+        .btn-success { 
+            background: var(--success-grad); color: #fff; 
+            box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3), inset 0 1px 1px rgba(255,255,255,0.2); 
+        }
 
         /* Native Inputs */
         .input-group {
-            background: rgba(255,255,255,0.05); border: 0.5px solid var(--surface-border);
-            border-radius: 14px; padding: 12px 16px;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; padding: 14px 18px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
         }
-        .input-group label { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+        .input-group label { font-size: 14px; color: var(--text-secondary); font-weight: 600; }
         .input-group input { 
             background: transparent; border: none; outline: none; color: #fff; 
-            font-size: 15px; font-weight: 600; text-align: right; 
+            font-size: 16px; font-weight: 700; text-align: right; 
             -webkit-appearance: none; appearance: none;
         }
         .input-group input[type="date"] { color: var(--success); color-scheme: dark; }
 
-        /* Checkboxes */
-        .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; }
+        /* Expressive Checkboxes */
+        .checkbox-list { display: flex; flex-direction: column; gap: 10px; max-height: 240px; overflow-y: auto; margin-bottom: 24px; }
         .custom-checkbox {
-            display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-            background: rgba(255,255,255,0.03); border: 0.5px solid var(--surface-border);
-            border-radius: 14px; transition: 0.2s var(--bezier);
+            display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--surface-border);
+            border-radius: 16px; transition: 0.2s var(--bezier); cursor: pointer;
         }
+        .custom-checkbox:active { transform: scale(0.98); }
         .custom-checkbox input { display: none; }
         .checker {
-            width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--text-tertiary);
+            width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--text-tertiary);
             display: flex; align-items: center; justify-content: center; transition: 0.2s var(--bezier);
+            background: rgba(0,0,0,0.3);
         }
-        .checker i { font-size: 10px; color: #000; opacity: 0; transform: scale(0.5); transition: 0.2s var(--bezier); }
-        .custom-checkbox input:checked + .checker { background: var(--accent); border-color: var(--accent); }
+        .checker i { font-size: 11px; color: #fff; opacity: 0; transform: scale(0.5); transition: 0.3s var(--bezier); }
+        .custom-checkbox input:checked + .checker { background: var(--accent-grad); border-color: transparent; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4); }
         .custom-checkbox input:checked + .checker i { opacity: 1; transform: scale(1); }
-        .checkbox-label { font-size: 14px; font-weight: 500; flex: 1; }
+        .checkbox-label { font-size: 15px; font-weight: 500; flex: 1; color: var(--text-primary); }
+        .custom-checkbox:has(input:checked) { background: rgba(255,255,255,0.08); border-color: rgba(124, 58, 237, 0.4); }
 
-        /* Markdown System Styling (For AI Text Fixes) */
-        .md-content { line-height: 1.5; word-wrap: break-word; }
-        .md-content p { margin-bottom: 10px; }
+        /* Markdown System Styling (Optimized Legibility) */
+        .md-content { line-height: 1.6; word-wrap: break-word; color: #fff; }
+        .md-content p { margin-bottom: 12px; }
         .md-content p:last-child { margin-bottom: 0; }
-        .md-content strong { color: #fff; font-weight: 700; }
+        .md-content strong { color: #fff; font-weight: 700; background: linear-gradient(90deg, #fff, #d4d4d8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .md-content em { font-style: italic; color: var(--text-secondary); }
-        .md-content ul { padding-left: 20px; margin-bottom: 12px; list-style-type: disc; }
-        .md-content ol { padding-left: 20px; margin-bottom: 12px; list-style-type: decimal; }
-        .md-content li { margin-bottom: 4px; padding-left: 4px; }
-        .md-content li::marker { color: var(--accent); }
-        .md-content code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.9em; }
-        .md-content pre { background: rgba(0,0,0,0.5); padding: 12px; border-radius: 12px; overflow-x: auto; margin-bottom: 12px; border: 0.5px solid var(--surface-border); }
-        .md-content pre code { background: transparent; padding: 0; font-size: 13px; }
-        .md-content h1, .md-content h2, .md-content h3, .md-content h4 { font-weight: 700; margin-top: 16px; margin-bottom: 8px; color: var(--accent); line-height: 1.2; }
-        .md-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin-left: 0; color: var(--text-secondary); }
-        .katex { color: inherit; font-size: 1.05em; } /* Inherit text color so formulas fit beautifully */
-        .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+        .md-content ul { padding-left: 20px; margin-bottom: 14px; list-style-type: none; }
+        .md-content ol { padding-left: 20px; margin-bottom: 14px; }
+        .md-content li { margin-bottom: 6px; padding-left: 8px; position: relative; }
+        .md-content ul li::before { content: '•'; position: absolute; left: -14px; color: var(--accent); font-weight: bold; font-size: 1.2em; top: -2px; }
+        .md-content code { background: rgba(255,255,255,0.12); padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.05); }
+        .md-content pre { background: rgba(0,0,0,0.6); padding: 14px; border-radius: 14px; overflow-x: auto; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08); }
+        .md-content pre code { background: transparent; padding: 0; font-size: 13px; border: none; }
+        .md-content h1, .md-content h2, .md-content h3, .md-content h4 { font-weight: 700; margin-top: 18px; margin-bottom: 10px; color: #fff; line-height: 1.2; text-shadow: 0 2px 10px rgba(124, 58, 237, 0.2); }
+        .md-content h3 { color: #EC4899; }
+        .md-content blockquote { border-left: 3px solid var(--accent); padding-left: 14px; margin-left: 0; color: var(--text-secondary); background: linear-gradient(90deg, rgba(124,58,237,0.1), transparent); padding-top: 8px; padding-bottom: 8px; border-radius: 0 8px 8px 0; }
+        .katex { color: #E2E8F0; font-size: 1.05em; } 
+        .katex-display { margin: 12px 0; overflow-x: auto; overflow-y: hidden; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 12px; }
 
-        /* Notes UI */
+        /* Rich Notes UI */
         .badge {
-            font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-            padding: 4px 8px; border-radius: 8px;
-            background: rgba(255, 255, 255, 0.12); color: var(--text-secondary);
+            font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px;
+            padding: 4px 10px; border-radius: 8px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+            color: #FFF; border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        .note-card { border-bottom: 0.5px solid var(--surface-border); padding-bottom: 20px; margin-bottom: 20px; }
+        .note-card { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 24px; margin-bottom: 24px; }
         .note-card:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .note-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .note-title { font-size: 17px; font-weight: 600; color: #fff; line-height: 1.3; max-width: 80%; }
+        .note-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .note-title { font-size: 18px; font-weight: 700; color: #fff; line-height: 1.3; max-width: 80%; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         
         .def-box {
-            background: rgba(94, 92, 230, 0.15); border-left: 3px solid var(--accent);
-            padding: 10px 12px; border-radius: 0 8px 8px 0; margin-bottom: 10px;
+            background: linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(79, 70, 229, 0.05)); 
+            border-left: 4px solid var(--accent);
+            padding: 12px 14px; border-radius: 0 12px 12px 0; margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .def-box span.term-title { font-weight: 600; color: var(--accent); margin-right: 6px; font-size: 13px; }
-        .def-box .def-text { font-size: 13px; color: #fff; display: inline; line-height: 1.4; }
+        .def-box span.term-title { font-weight: 700; color: #A78BFA; margin-right: 6px; font-size: 14px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+        .def-box .def-text { font-size: 14px; color: rgba(255,255,255,0.9); display: inline; line-height: 1.5; }
         .def-box .def-text p { display: inline; margin: 0; }
 
         .formula-box {
-            background: rgba(0,0,0,0.5); border: 0.5px solid var(--surface-border);
-            padding: 12px; border-radius: 12px; text-align: center; margin-bottom: 10px;
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);
+            padding: 16px; border-radius: 16px; text-align: center; margin-bottom: 12px;
+            box-shadow: inset 0 2px 12px rgba(0,0,0,0.3);
         }
-        .formula-box .eq { font-family: ui-monospace, monospace; font-size: 16px; font-weight: 700; color: var(--success); margin-bottom: 2px; }
-        .formula-box .meaning { font-size: 11px; color: var(--text-secondary); }
+        .formula-box .eq { font-family: ui-monospace, monospace; font-size: 18px; font-weight: 800; color: #34D399; margin-bottom: 4px; text-shadow: 0 2px 10px rgba(16, 185, 129, 0.3); }
+        .formula-box .meaning { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
         .deriv-box {
-            background: rgba(255,255,255,0.03); border: 0.5px solid var(--surface-border);
-            padding: 12px; border-radius: 12px; margin-bottom: 10px;
+            background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+            padding: 14px; border-radius: 16px; margin-bottom: 12px;
         }
-        .deriv-box h5 { font-size: 13px; color: var(--accent); margin-bottom: 6px; font-weight: 600; }
-        .deriv-box .deriv-content { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; }
+        .deriv-box h5 { font-size: 14px; color: #60A5FA; margin-bottom: 8px; font-weight: 700; }
+        .deriv-box .deriv-content { font-family: ui-monospace, monospace; font-size: 13px; color: rgba(255,255,255,0.8); white-space: pre-wrap; line-height: 1.5; }
 
-        .note-list { list-style: none; padding-left: 2px; }
-        .note-list li {
-            position: relative; padding-left: 16px; font-size: 13px; color: var(--text-primary);
-            line-height: 1.4; margin-bottom: 6px;
-        }
-        .note-list li::before {
-            content: ''; position: absolute; left: 0; top: 6px; width: 5px; height: 5px;
-            border-radius: 50%; background: var(--success);
-        }
-
-        /* Timeline (Schedule) */
-        .timeline { position: relative; padding-left: 24px; margin-top: 12px; margin-left: 16px; }
+        /* Timeline (Vibrant Schedule) */
+        .timeline { position: relative; padding-left: 28px; margin-top: 16px; margin-left: 12px; }
         .timeline::before {
-            content: ''; position: absolute; left: 0px; top: 0; bottom: 0; width: 1.5px;
-            background: linear-gradient(to bottom, var(--accent) 0%, rgba(255,255,255,0.05) 100%);
+            content: ''; position: absolute; left: 0px; top: 0; bottom: 0; width: 2px;
+            background: linear-gradient(to bottom, var(--accent) 0%, #EC4899 50%, rgba(255,255,255,0.05) 100%);
+            border-radius: 2px;
         }
-        .timeline-item { position: relative; margin-bottom: 28px; }
+        .timeline-item { position: relative; margin-bottom: 32px; }
         .timeline-dot {
-            position: absolute; left: -34px; top: 12px; width: 20px; height: 20px;
-            border-radius: 50%; background: var(--bg-color); border: 2px solid var(--accent);
-            display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+            position: absolute; left: -39px; top: 12px; width: 24px; height: 24px;
+            border-radius: 50%; background: var(--bg-color); border: 3px solid var(--accent);
+            display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;
+            box-shadow: 0 0 12px var(--accent-glow); color: #fff; z-index: 2;
         }
         .timeline-content {
-            background: var(--surface-color); border: 0.5px solid var(--surface-border);
-            border-radius: 16px; padding: 14px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            background: linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 18px;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
         }
-        .tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .tl-date { color: var(--success); font-size: 12px; font-weight: 700; }
-        .tl-hours { color: var(--text-secondary); font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-        .tl-focus { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+        .tl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .tl-date { color: #34D399; font-size: 13px; font-weight: 800; letter-spacing: 0.5px; }
+        .tl-hours { color: var(--text-secondary); font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .tl-focus { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #FFF; }
         .tl-topic {
-            background: rgba(0,0,0,0.4); padding: 8px 10px; border-radius: 10px;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+            background: rgba(0,0,0,0.4); padding: 10px 14px; border-radius: 12px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        .tl-topic-name { font-size: 12px; font-weight: 500; }
-        .tl-topic-time { font-size: 10px; color: var(--accent); font-weight: 700; background: rgba(94, 92, 230, 0.15); padding: 3px 6px; border-radius: 6px; }
-        .tl-advice { font-size: 12px; color: var(--text-secondary); margin-top: 10px; padding-left: 8px; border-left: 2px solid var(--surface-border); }
+        .tl-topic-name { font-size: 13px; font-weight: 600; color: #E2E8F0; }
+        .tl-topic-time { font-size: 11px; color: #fff; font-weight: 700; background: var(--accent-grad); padding: 4px 8px; border-radius: 8px; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.4); }
+        .tl-advice { font-size: 13px; color: rgba(255,255,255,0.8); margin-top: 14px; padding-left: 10px; border-left: 3px solid #EC4899; line-height: 1.5; }
 
         /* Quiz */
-        .q-card { margin-bottom: 16px; }
-        .q-label { font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; margin-bottom: 8px; }
-        .q-text { font-size: 16px; font-weight: 600; line-height: 1.4; margin-bottom: 16px; }
+        .q-card { margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.12); }
+        .q-label { font-size: 12px; font-weight: 800; color: #A78BFA; letter-spacing: 1px; margin-bottom: 10px; text-transform: uppercase; }
+        .q-text { font-size: 17px; font-weight: 600; line-height: 1.5; margin-bottom: 20px; color: #FFF; }
         
         .quiz-opt-label {
-            display: flex; align-items: center; padding: 12px 14px; margin-bottom: 10px;
-            background: rgba(255,255,255,0.04); border: 1px solid var(--surface-border);
-            border-radius: 14px; font-size: 14px; font-weight: 500; line-height: 1.4;
-            transition: all 0.2s var(--bezier);
+            display: flex; align-items: center; padding: 14px 16px; margin-bottom: 12px;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; font-size: 15px; font-weight: 500; line-height: 1.4;
+            transition: all 0.2s var(--bezier); cursor: pointer; color: #E2E8F0;
         }
         .quiz-opt-label input { display: none; }
-        .quiz-opt-label:active { transform: scale(0.98); }
+        .quiz-opt-label:active { transform: scale(0.97); }
         .quiz-opt-label:has(input:checked) {
-            background: rgba(94, 92, 230, 0.15); border-color: var(--accent);
+            background: rgba(124, 58, 237, 0.15); border-color: #8B5CF6;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.2); color: #fff; font-weight: 600;
         }
-        .quiz-res-box { padding: 12px; border-radius: 12px; margin-top: 12px; font-size: 13px; line-height: 1.4; }
-        .quiz-res-box.correct { background: rgba(50, 215, 75, 0.1); border: 1px solid rgba(50, 215, 75, 0.3); }
-        .quiz-res-box.wrong { background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.3); }
+        .quiz-res-box { padding: 14px; border-radius: 14px; margin-top: 16px; font-size: 14px; line-height: 1.5; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .quiz-res-box.correct { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2); }
+        .quiz-res-box.wrong { background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); box-shadow: 0 4px 16px rgba(244, 63, 94, 0.2); }
 
-        /* Chat */
+        /* Vibrant Chat UI */
         .chat-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin: -16px; padding: 16px; padding-bottom: 80px; }
-        .chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px; }
+        .chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; }
         
-        .chat-bubble { max-width: 85%; padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; animation: fadeScale 0.3s var(--bezier); }
+        .chat-bubble { max-width: 88%; padding: 14px 18px; border-radius: 22px; font-size: 15px; line-height: 1.5; animation: fadeScale 0.3s var(--bezier); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         
         .chat-ai {
-            background: var(--surface-color); border: 0.5px solid var(--surface-border);
-            align-self: flex-start; border-bottom-left-radius: 4px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+            border: 1px solid rgba(255,255,255,0.1); color: #FFF;
+            align-self: flex-start; border-bottom-left-radius: 6px; 
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
         }
-        .chat-user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .chat-user { 
+            background: var(--accent-grad); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            align-self: flex-end; border-bottom-right-radius: 6px; 
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3); border: 1px solid rgba(255,255,255,0.15);
+        }
         
-        .typing-dots { display: flex; gap: 4px; padding: 4px; }
-        .typing-dots span { width: 6px; height: 6px; background: var(--text-secondary); border-radius: 50%; animation: typeDot 1.4s infinite ease-in-out both; }
+        .typing-dots { display: flex; gap: 5px; padding: 6px 4px; }
+        .typing-dots span { width: 7px; height: 7px; background: rgba(255,255,255,0.8); border-radius: 50%; animation: typeDot 1.4s infinite ease-in-out both; }
         .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
         .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes typeDot { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        @keyframes typeDot { 0%, 80%, 100% { transform: scale(0); opacity: 0.3; } 40% { transform: scale(1); opacity: 1; } }
 
-        /* Chat Input moved slightly higher to clear bigger nav bar */
+        /* Premium Input Box */
         .chat-input-wrapper {
             position: fixed; bottom: calc(112px + env(safe-area-inset-bottom)); 
             left: 50%; transform: translateX(-50%);
             width: 100%; max-width: 430px; padding: 0 16px; z-index: 40;
         }
         .chat-input-box {
-            background: rgba(20, 20, 20, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-            border: 0.5px solid var(--surface-border); border-radius: 100px;
-            display: flex; align-items: center; padding: 6px 6px 6px 16px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            background: rgba(15, 15, 20, 0.75); backdrop-filter: blur(30px) saturate(200%); -webkit-backdrop-filter: blur(30px) saturate(200%);
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 100px;
+            display: flex; align-items: center; padding: 8px 8px 8px 20px;
+            box-shadow: 0 16px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
         }
         .chat-input-box input {
             flex: 1; background: transparent; border: none; outline: none;
-            color: #fff; font-size: 15px;
+            color: #fff; font-size: 16px; font-weight: 500;
         }
-        .chat-input-box input::placeholder { color: var(--text-tertiary); }
+        .chat-input-box input::placeholder { color: var(--text-tertiary); font-weight: 400; }
         .chat-send-btn {
-            width: 34px; height: 34px; border-radius: 50%; background: var(--accent);
+            width: 38px; height: 38px; border-radius: 50%; background: var(--accent-grad);
             border: none; color: #fff; display: flex; align-items: center; justify-content: center;
             cursor: pointer; transition: 0.2s var(--bezier); flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4); font-size: 15px;
         }
         .chat-send-btn:active { transform: scale(0.9); }
 
-        /* LARGER Dynamic Island Navigation for 6.7" Display */
+        /* EXPRESSIVE Dynamic Island Navigation */
         .dynamic-island {
             position: fixed; bottom: calc(24px + env(safe-area-inset-bottom)); 
             left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
-            border: 0.5px solid rgba(255,255,255,0.12); border-radius: 100px;
-            display: flex; padding: 10px; gap: 8px; /* Increased padding and gap */
-            box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+            background: rgba(15, 15, 20, 0.7); backdrop-filter: blur(40px) saturate(200%); -webkit-backdrop-filter: blur(40px) saturate(200%);
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 100px;
+            display: flex; padding: 10px; gap: 8px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
             z-index: 100;
         }
         .nav-indicator {
-            position: absolute; top: 10px; left: 10px; width: 56px; height: 56px; /* Bigger indicator */
-            background: rgba(255,255,255,0.12); border-radius: 50%;
+            position: absolute; top: 10px; left: 10px; width: 56px; height: 56px;
+            background: rgba(255,255,255,0.15); border-radius: 50%;
             transition: transform 0.4s var(--bezier); z-index: 0; pointer-events: none;
+            box-shadow: 0 0 12px rgba(255,255,255,0.1);
         }
         .nav-btn {
-            width: 56px; height: 56px; /* Bigger button area */
+            width: 56px; height: 56px;
             border-radius: 50%; border: none; background: transparent;
-            color: var(--text-tertiary); display: flex; align-items: center; justify-content: center;
-            font-size: 22px; /* Bigger Icons */ 
-            cursor: pointer; position: relative; z-index: 1;
-            transition: color 0.3s var(--bezier), transform 0.2s var(--bezier);
+            color: rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center;
+            font-size: 22px; cursor: pointer; position: relative; z-index: 1;
+            transition: all 0.3s var(--bezier);
         }
         .nav-btn:active { transform: scale(0.85); }
-        .nav-btn.nav-active { color: #fff; }
+        .nav-btn.nav-active { color: #fff; text-shadow: 0 0 16px rgba(255,255,255,0.6); transform: scale(1.05); }
 
-        /* Global Loader */
+        /* Global Loader (Brighter and Premium) */
         .loader-overlay {
             position: fixed; inset: 0; z-index: 9999;
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            background: rgba(10,10,15,0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             opacity: 0; pointer-events: none; transition: opacity 0.3s var(--bezier);
         }
         .loader-overlay.active { opacity: 1; pointer-events: auto; }
         .spinner {
-            width: 44px; height: 44px; border-radius: 50%;
-            background: conic-gradient(from 0deg, transparent 0%, var(--accent) 100%);
-            mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
-            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
-            animation: spin 1s linear infinite; margin-bottom: 20px;
+            width: 52px; height: 52px; border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 0%, #7C3AED 50%, #EC4899 100%);
+            mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+            -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+            animation: spin 1s linear infinite; margin-bottom: 24px; filter: drop-shadow(0 0 8px rgba(124, 58, 237, 0.5));
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        .loader-title { font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 6px; }
-        .loader-text { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.4; max-width: 250px; }
-        .pdf-page { background: #000; color: #fff; }
+        .loader-title { font-size: 19px; font-weight: 700; color: #fff; margin-bottom: 8px; letter-spacing: 0.3px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .loader-text { font-size: 14px; color: rgba(255,255,255,0.7); text-align: center; line-height: 1.5; max-width: 260px; }
+        
+        .pdf-page { background: var(--bg-color); color: #fff; }
     </style>
 </head>
 <body>
 
     <div class="ambient-bg">
-        <div class="orb blue"></div>
-        <div class="orb green"></div>
+        <div class="orb one"></div>
+        <div class="orb two"></div>
+        <div class="orb three"></div>
     </div>
 
     <!-- Global Loader -->
@@ -731,15 +766,15 @@ KAPARSH_FRONTEND = r"""
             
         <!-- Tab: Home -->
         <div id="tab-home" class="tab-pane flex">
-            <div class="glass-card" style="margin-bottom: 20px; border: none; background: radial-gradient(circle at top left, rgba(94, 92, 230, 0.25), transparent 70%), var(--surface-color);">
+            <div class="glass-card" style="margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.35), transparent 80%), linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));">
                 <h2 class="large-title">Chapter<br>Analysis</h2>
                 <p class="sub-title" style="margin-bottom: 0;">Upload a textbook chapter for deep-extraction notes, formulas, and intelligence.</p>
             </div>
 
             <label id="drop-zone" for="file-upload" class="upload-zone">
                 <div class="upload-icons">
-                    <i class="fa-solid fa-file-pdf" style="color: var(--accent);"></i>
-                    <i class="fa-solid fa-image" style="color: var(--success);"></i>
+                    <i class="fa-solid fa-file-pdf" style="color: #A78BFA;"></i>
+                    <i class="fa-solid fa-image" style="color: #34D399;"></i>
                 </div>
                 <div id="file-name" class="upload-text">Tap to Upload File</div>
                 <input type="file" id="file-upload" accept="application/pdf, image/png, image/jpeg, image/jpg">
@@ -747,7 +782,7 @@ KAPARSH_FRONTEND = r"""
 
             <button id="analyze-btn" class="btn-primary">
                 Generate Intelligence
-                <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 14px;"></i>
+                <i class="fa-solid fa-wand-magic-sparkles" style="font-size: 15px; margin-left: 4px;"></i>
             </button>
         </div>
 
@@ -757,10 +792,10 @@ KAPARSH_FRONTEND = r"""
                 <span>Notes Feed</span>
                 <span id="topic-count" class="badge">0 Topics</span>
             </div>
-            <div id="topics-grid" class="glass-card" style="padding: 24px 16px;">
-                <div style="text-align: center; padding: 40px 0; opacity: 0.5;">
-                    <i class="fa-solid fa-layer-group" style="font-size: 32px; margin-bottom: 12px;"></i>
-                    <p style="font-size: 14px; font-weight: 500;">Your digital notebook is empty.</p>
+            <div id="topics-grid" class="glass-card" style="padding: 24px 18px;">
+                <div style="text-align: center; padding: 40px 0; opacity: 0.6;">
+                    <i class="fa-solid fa-layer-group" style="font-size: 36px; margin-bottom: 16px; color: rgba(255,255,255,0.5);"></i>
+                    <p style="font-size: 15px; font-weight: 500;">Your digital notebook is empty.</p>
                 </div>
             </div>
         </div>
@@ -768,11 +803,11 @@ KAPARSH_FRONTEND = r"""
         <!-- Tab: Schedule -->
         <div id="tab-schedule" class="tab-pane hidden">
             <div id="schedule-setup">
-                <div style="text-align: center; margin-bottom: 24px;">
-                    <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(94, 92, 230, 0.15); border: 1px solid rgba(94, 92, 230, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; font-size: 24px; color: var(--accent);">
+                <div style="text-align: center; margin-bottom: 28px;">
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(236, 72, 153, 0.2)); border: 1px solid rgba(255, 255, 255, 0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; color: #FFF; box-shadow: 0 8px 20px rgba(124, 58, 237, 0.25);">
                         <i class="fa-solid fa-calendar-day"></i>
                     </div>
-                    <h2 class="large-title" style="font-size: 24px;">Master Planner</h2>
+                    <h2 class="large-title" style="font-size: 26px;">Master Planner</h2>
                     <p class="sub-title" style="margin-bottom: 0;">Set parameters and upload syllabus.</p>
                 </div>
                 
@@ -780,19 +815,19 @@ KAPARSH_FRONTEND = r"""
                     <label>Target Exam Date</label>
                     <input type="date" id="schedule-exam-date">
                 </div>
-                <div class="input-group" style="margin-bottom: 20px;">
+                <div class="input-group" style="margin-bottom: 24px;">
                     <label>Daily Study Hours</label>
-                    <input type="number" id="schedule-study-hours" value="2" min="1" max="16" style="width: 50px;">
+                    <input type="number" id="schedule-study-hours" value="2" min="1" max="16" style="width: 60px;">
                 </div>
 
-                <label id="syllabus-drop-zone" for="syllabus-upload" class="upload-zone" style="padding: 24px 16px;">
-                    <div class="upload-icons" style="margin-bottom: 8px;"><i class="fa-solid fa-book" style="color: var(--accent);"></i></div>
-                    <div id="syllabus-file-name" class="upload-text" style="font-size: 14px;">Upload Syllabus (Optional)</div>
+                <label id="syllabus-drop-zone" for="syllabus-upload" class="upload-zone" style="padding: 28px 16px;">
+                    <div class="upload-icons" style="margin-bottom: 10px;"><i class="fa-solid fa-book" style="color: #60A5FA;"></i></div>
+                    <div id="syllabus-file-name" class="upload-text" style="font-size: 15px;">Upload Syllabus (Optional)</div>
                     <input type="file" id="syllabus-upload" accept="application/pdf, image/png, image/jpeg, image/jpg">
                 </label>
 
-                <div id="subject-selector-area" class="hidden" style="margin-bottom: 20px;">
-                    <p style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 10px;">Select Subjects to Study</p>
+                <div id="subject-selector-area" class="hidden" style="margin-bottom: 24px;">
+                    <p style="font-size: 12px; font-weight: 700; color: #A78BFA; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px;">Select Subjects to Study</p>
                     <div id="subject-checkboxes" class="checkbox-list"></div>
                 </div>
 
@@ -808,16 +843,16 @@ KAPARSH_FRONTEND = r"""
         <!-- Tab: Quiz -->
         <div id="tab-quiz" class="tab-pane hidden">
             <div id="quiz-setup" style="text-align: center; padding: 32px 0;">
-                <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(50, 215, 75, 0.15); border: 1px solid rgba(50, 215, 75, 0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; color: var(--success);">
+                <div style="width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2)); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 30px; color: #34D399; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);">
                     <i class="fa-solid fa-gamepad"></i>
                 </div>
-                <h2 class="large-title" style="font-size: 24px;">Dynamic Quiz</h2>
+                <h2 class="large-title" style="font-size: 26px;">Dynamic Quiz</h2>
                 <p class="sub-title">Test mastery of the analyzed chapter.</p>
-                <button onclick="generateQuiz()" class="btn-primary btn-success" style="margin-top: 16px;">Start Knowledge Check</button>
+                <button onclick="generateQuiz()" class="btn-primary btn-success" style="margin-top: 24px;">Start Knowledge Check</button>
             </div>
             <div id="quiz-result" class="hidden flex-col">
                 <div id="quiz-questions-container"></div>
-                <button onclick="checkAnswers()" class="btn-primary" style="margin-top: 16px;">Submit Answers</button>
+                <button onclick="checkAnswers()" class="btn-primary" style="margin-top: 20px;">Submit Answers</button>
                 <div id="quiz-score-area"></div>
             </div>
         </div>
@@ -868,7 +903,7 @@ KAPARSH_FRONTEND = r"""
                         {left: '\\(', right: '\\)', display: false}
                     ],
                     throwOnError: false,
-                    errorColor: 'var(--danger)'
+                    errorColor: '#F43F5E'
                 });
             }
         }
@@ -895,7 +930,7 @@ KAPARSH_FRONTEND = r"""
             navBtns.forEach(btn => btn.classList.remove('nav-active'));
             navBtns[index].classList.add('nav-active');
             
-            // Transform logic for larger nav bar (56px width + 8px gap = 64px spacing step)
+            // Transform logic for nav bar (56px width + 8px gap = 64px spacing step)
             indicator.style.transform = `translateX(${index * 64}px)`;
 
             tabPanes.forEach(pane => { pane.classList.add('hidden'); pane.classList.remove('flex'); });
@@ -932,7 +967,7 @@ KAPARSH_FRONTEND = r"""
             if (fileInput.files.length > 0) {
                 AppState.file = fileInput.files[0];
                 fileNameDisplay.textContent = AppState.file.name;
-                fileNameDisplay.style.color = 'var(--accent)';
+                fileNameDisplay.style.color = '#A78BFA';
             }
         });
         
@@ -942,7 +977,7 @@ KAPARSH_FRONTEND = r"""
             if (syllabusInput.files.length > 0) {
                 AppState.syllabusFile = syllabusInput.files[0];
                 syllabusNameDisplay.textContent = AppState.syllabusFile.name;
-                syllabusNameDisplay.style.color = 'var(--success)';
+                syllabusNameDisplay.style.color = '#34D399';
                 await parseSyllabusSubjects();
             }
         });
@@ -1059,13 +1094,13 @@ KAPARSH_FRONTEND = r"""
                 if (!t.loaded) {
                     return `
                     <div class="note-card" style="opacity: 0.5; animation: fadeScale 1s infinite alternate;">
-                        <div style="height: 18px; background: var(--surface-border); border-radius: 4px; width: 60%; margin-bottom: 12px;"></div>
-                        <div style="height: 12px; background: var(--surface-border); border-radius: 4px; width: 80%;"></div>
+                        <div style="height: 20px; background: rgba(255,255,255,0.1); border-radius: 6px; width: 60%; margin-bottom: 14px;"></div>
+                        <div style="height: 14px; background: rgba(255,255,255,0.06); border-radius: 6px; width: 85%;"></div>
                     </div>`;
                 }
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
-                    <div style="margin-top: 14px;">
+                    <div style="margin-top: 16px;">
                         ${t.definitions.map(d => {
                             const inlineDef = marked.parseInline(d.definition || '');
                             return `
@@ -1078,7 +1113,7 @@ KAPARSH_FRONTEND = r"""
                     </div>` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
-                    <div style="margin-top: 14px;">
+                    <div style="margin-top: 16px;">
                         ${t.formulas.map(f => {
                             const mathEq = (f.equation || '').includes('$') ? f.equation : `$$${f.equation}$$`;
                             const inlineMean = marked.parseInline(f.meaning || '');
@@ -1092,7 +1127,7 @@ KAPARSH_FRONTEND = r"""
                     </div>` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
-                    <div style="margin-top: 14px;">
+                    <div style="margin-top: 16px;">
                         ${t.derivations.map(d => {
                             const inlineTitle = marked.parseInline(d.title || '');
                             const bodyContent = marked.parse(d.content || '');
@@ -1118,7 +1153,7 @@ KAPARSH_FRONTEND = r"""
                     ${defsHtml}
                     ${formulasHtml}
                     ${derivationsHtml}
-                    ${notesList ? `<ul class="note-list" style="margin-top:14px;">${notesList}</ul>` : ''}
+                    ${notesList ? `<ul class="note-list md-content" style="margin-top:16px;">${notesList}</ul>` : ''}
                 </div>`;
             }).join('');
 
@@ -1132,7 +1167,7 @@ KAPARSH_FRONTEND = r"""
                 margin: 0.5,
                 filename: 'Kaparsh_Notes.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#000000' },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#0A0A0F' },
                 jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
             };
             html2pdf().set(opt).from(element).save();
@@ -1261,7 +1296,7 @@ KAPARSH_FRONTEND = r"""
                         ${(q.options || []).map(opt => `
                             <label class="quiz-opt-label">
                                 <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}">
-                                <span class="md-content">${marked.parseInline(opt)}</span>
+                                <span class="md-content" style="color: inherit;">${marked.parseInline(opt)}</span>
                             </label>
                         `).join('')}
                     </div>
@@ -1281,7 +1316,7 @@ KAPARSH_FRONTEND = r"""
                 const card = document.getElementById(`qcard-${index}`);
                 
                 if (!selected) {
-                    resultDiv.innerHTML = `<div style="color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 10px;"><i class="fa-solid fa-circle-exclamation"></i> Selection required</div>`;
+                    resultDiv.innerHTML = `<div style="color: #F43F5E; font-size: 14px; font-weight: 700; margin-top: 12px;"><i class="fa-solid fa-circle-exclamation"></i> Selection required</div>`;
                     return;
                 }
                 
@@ -1290,19 +1325,19 @@ KAPARSH_FRONTEND = r"""
                     score++;
                     resultDiv.innerHTML = `
                         <div class="quiz-res-box correct md-content">
-                            <strong style="color: var(--success); display: block; margin-bottom: 4px;">Correct</strong>
-                            <span style="color: rgba(255,255,255,0.8);">${explHtml}</span>
+                            <strong style="color: #34D399; display: block; margin-bottom: 6px; font-size: 15px;">Correct</strong>
+                            <span style="color: rgba(255,255,255,0.9);">${explHtml}</span>
                         </div>`;
-                    card.style.borderColor = 'rgba(50, 215, 75, 0.4)';
+                    card.style.borderColor = 'rgba(16, 185, 129, 0.5)';
                 } else {
                     const corrAns = marked.parseInline(q.correct_answer || '');
                     resultDiv.innerHTML = `
                         <div class="quiz-res-box wrong md-content">
-                            <strong style="color: var(--danger); display: block; margin-bottom: 4px;">Incorrect</strong>
-                            <div style="font-size: 12px; margin-bottom: 6px;">Correct: <strong>${corrAns}</strong></div>
-                            <span style="color: rgba(255,255,255,0.8);">${explHtml}</span>
+                            <strong style="color: #F43F5E; display: block; margin-bottom: 4px; font-size: 15px;">Incorrect</strong>
+                            <div style="font-size: 13px; margin-bottom: 8px;">Correct: <strong style="color: #fff;">${corrAns}</strong></div>
+                            <span style="color: rgba(255,255,255,0.9);">${explHtml}</span>
                         </div>`;
-                    card.style.borderColor = 'rgba(255, 69, 58, 0.4)';
+                    card.style.borderColor = 'rgba(244, 63, 94, 0.5)';
                 }
             });
             
@@ -1310,9 +1345,9 @@ KAPARSH_FRONTEND = r"""
 
             if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
                 document.getElementById('quiz-score-area').innerHTML = `
-                    <div class="glass-card" style="text-align: center; margin-top: 24px; padding: 32px 16px;">
-                        <p style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Final Score</p>
-                        <div style="font-size: 42px; font-weight: 800; color: #fff; line-height: 1;">${score} <span style="font-size: 20px; color: var(--text-tertiary);">/ ${AppState.quiz.length}</span></div>
+                    <div class="glass-card" style="text-align: center; margin-top: 28px; padding: 36px 16px; background: linear-gradient(145deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05)); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <p style="font-size: 13px; font-weight: 800; color: #34D399; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;">Final Score</p>
+                        <div style="font-size: 48px; font-weight: 800; color: #fff; line-height: 1; text-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);">${score} <span style="font-size: 22px; color: rgba(255,255,255,0.5);">/ ${AppState.quiz.length}</span></div>
                     </div>
                 `;
             }
@@ -1337,7 +1372,7 @@ KAPARSH_FRONTEND = r"""
 
             const loaderId = 'loader-' + Date.now();
             chatHistory.innerHTML += `
-                <div id="${loaderId}" class="chat-bubble chat-ai" style="padding: 14px 16px;">
+                <div id="${loaderId}" class="chat-bubble chat-ai" style="padding: 16px 18px;">
                     <div class="typing-dots"><span></span><span></span><span></span></div>
                 </div>`;
             chatHistory.scrollTop = chatHistory.scrollHeight;
