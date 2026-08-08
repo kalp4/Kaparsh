@@ -338,6 +338,12 @@ KAPARSH_FRONTEND = r"""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
+    <!-- Added libraries to fix Markdown (**, lists, code) and LaTeX (Math equations $$...$$) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
     <style>
         /* APPLE HIG / iOS 18 SMARTPHONE DESIGN SYSTEM */
         :root {
@@ -396,7 +402,6 @@ KAPARSH_FRONTEND = r"""
             margin: 0 auto;
             min-height: 100vh;
             position: relative;
-            /* Increased bottom padding to accommodate larger bottom bar */
             padding: env(safe-area-inset-top) 16px calc(130px + env(safe-area-inset-bottom)) 16px;
             display: flex; flex-direction: column;
         }
@@ -435,7 +440,7 @@ KAPARSH_FRONTEND = r"""
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
-        /* Glass Cards (Optimized for Mobile) */
+        /* Glass Cards */
         .glass-card {
             background: var(--surface-color);
             backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -486,7 +491,7 @@ KAPARSH_FRONTEND = r"""
         }
         .input-group input[type="date"] { color: var(--success); color-scheme: dark; }
 
-        /* Checkboxes (Syllabus) */
+        /* Checkboxes */
         .checkbox-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; margin-bottom: 20px; }
         .custom-checkbox {
             display: flex; align-items: center; gap: 12px; padding: 12px 16px;
@@ -503,6 +508,24 @@ KAPARSH_FRONTEND = r"""
         .custom-checkbox input:checked + .checker i { opacity: 1; transform: scale(1); }
         .checkbox-label { font-size: 14px; font-weight: 500; flex: 1; }
 
+        /* Markdown System Styling (For AI Text Fixes) */
+        .md-content { line-height: 1.5; word-wrap: break-word; }
+        .md-content p { margin-bottom: 10px; }
+        .md-content p:last-child { margin-bottom: 0; }
+        .md-content strong { color: #fff; font-weight: 700; }
+        .md-content em { font-style: italic; color: var(--text-secondary); }
+        .md-content ul { padding-left: 20px; margin-bottom: 12px; list-style-type: disc; }
+        .md-content ol { padding-left: 20px; margin-bottom: 12px; list-style-type: decimal; }
+        .md-content li { margin-bottom: 4px; padding-left: 4px; }
+        .md-content li::marker { color: var(--accent); }
+        .md-content code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.9em; }
+        .md-content pre { background: rgba(0,0,0,0.5); padding: 12px; border-radius: 12px; overflow-x: auto; margin-bottom: 12px; border: 0.5px solid var(--surface-border); }
+        .md-content pre code { background: transparent; padding: 0; font-size: 13px; }
+        .md-content h1, .md-content h2, .md-content h3, .md-content h4 { font-weight: 700; margin-top: 16px; margin-bottom: 8px; color: var(--accent); line-height: 1.2; }
+        .md-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin-left: 0; color: var(--text-secondary); }
+        .katex { color: inherit; font-size: 1.05em; } /* Inherit text color so formulas fit beautifully */
+        .katex-display { margin: 10px 0; overflow-x: auto; overflow-y: hidden; }
+
         /* Notes UI */
         .badge {
             font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
@@ -518,8 +541,9 @@ KAPARSH_FRONTEND = r"""
             background: rgba(94, 92, 230, 0.15); border-left: 3px solid var(--accent);
             padding: 10px 12px; border-radius: 0 8px 8px 0; margin-bottom: 10px;
         }
-        .def-box span { font-weight: 600; color: var(--accent); margin-right: 6px; font-size: 13px; }
-        .def-box p { font-size: 13px; color: #fff; display: inline; line-height: 1.4; }
+        .def-box span.term-title { font-weight: 600; color: var(--accent); margin-right: 6px; font-size: 13px; }
+        .def-box .def-text { font-size: 13px; color: #fff; display: inline; line-height: 1.4; }
+        .def-box .def-text p { display: inline; margin: 0; }
 
         .formula-box {
             background: rgba(0,0,0,0.5); border: 0.5px solid var(--surface-border);
@@ -532,8 +556,8 @@ KAPARSH_FRONTEND = r"""
             background: rgba(255,255,255,0.03); border: 0.5px solid var(--surface-border);
             padding: 12px; border-radius: 12px; margin-bottom: 10px;
         }
-        .deriv-box h5 { font-size: 12px; color: var(--accent); margin-bottom: 6px; font-weight: 600; }
-        .deriv-box pre { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; }
+        .deriv-box h5 { font-size: 13px; color: var(--accent); margin-bottom: 6px; font-weight: 600; }
+        .deriv-box .deriv-content { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-secondary); white-space: pre-wrap; }
 
         .note-list { list-style: none; padding-left: 2px; }
         .note-list li {
@@ -545,7 +569,7 @@ KAPARSH_FRONTEND = r"""
             border-radius: 50%; background: var(--success);
         }
 
-        /* Timeline (Schedule) Fix for Mobile */
+        /* Timeline (Schedule) */
         .timeline { position: relative; padding-left: 24px; margin-top: 12px; margin-left: 16px; }
         .timeline::before {
             content: ''; position: absolute; left: 0px; top: 0; bottom: 0; width: 1.5px;
@@ -593,7 +617,7 @@ KAPARSH_FRONTEND = r"""
         .quiz-res-box.correct { background: rgba(50, 215, 75, 0.1); border: 1px solid rgba(50, 215, 75, 0.3); }
         .quiz-res-box.wrong { background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.3); }
 
-        /* Chat (Mobile Constraints Fixed) */
+        /* Chat */
         .chat-pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; margin: -16px; padding: 16px; padding-bottom: 80px; }
         .chat-history { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 20px; }
         
@@ -646,7 +670,7 @@ KAPARSH_FRONTEND = r"""
             z-index: 100;
         }
         .nav-indicator {
-            position: absolute; top: 10px; left: 10px; width: 56px; height: 56px; /* Bigger indicator matching button */
+            position: absolute; top: 10px; left: 10px; width: 56px; height: 56px; /* Bigger indicator */
             background: rgba(255,255,255,0.12); border-radius: 50%;
             transition: transform 0.4s var(--bezier); z-index: 0; pointer-events: none;
         }
@@ -661,7 +685,7 @@ KAPARSH_FRONTEND = r"""
         .nav-btn:active { transform: scale(0.85); }
         .nav-btn.nav-active { color: #fff; }
 
-        /* Global Loader Fix */
+        /* Global Loader */
         .loader-overlay {
             position: fixed; inset: 0; z-index: 9999;
             background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -679,8 +703,6 @@ KAPARSH_FRONTEND = r"""
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .loader-title { font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 6px; }
         .loader-text { font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.4; max-width: 250px; }
-
-        /* Print Override */
         .pdf-page { background: #000; color: #fff; }
     </style>
 </head>
@@ -804,7 +826,7 @@ KAPARSH_FRONTEND = r"""
         <div id="tab-doubts" class="tab-pane chat-pane hidden">
             <div class="section-header">Study Assistant</div>
             <div id="chat-history" class="chat-history">
-                <div class="chat-bubble chat-ai">Hi there! Ask me anything about the chapter you just analyzed.</div>
+                <div class="chat-bubble chat-ai md-content">Hi there! Ask me anything about the chapter you just analyzed.</div>
             </div>
             <div class="chat-input-wrapper" data-html2canvas-ignore>
                 <div class="chat-input-box">
@@ -827,6 +849,30 @@ KAPARSH_FRONTEND = r"""
     </nav>
 
     <script>
+        // CONFIG MARKED FOR GFM
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
+
+        // AUTO RENDER LATEX MATH HELPER
+        function applyMath() {
+            if (window.renderMathInElement) {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '\\[', right: '\\]', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false}
+                    ],
+                    throwOnError: false,
+                    errorColor: 'var(--danger)'
+                });
+            }
+        }
+
         const AppState = {
             extractedText: "", topics: null, schedule: null, quiz: null,
             file: null, syllabusFile: null, syllabusContextText: "", globalBannedTerms: [] 
@@ -1020,34 +1066,48 @@ KAPARSH_FRONTEND = r"""
 
                 const defsHtml = (t.definitions && t.definitions.length > 0) ? `
                     <div style="margin-top: 14px;">
-                        ${t.definitions.map(d => `
+                        ${t.definitions.map(d => {
+                            const inlineDef = marked.parseInline(d.definition || '');
+                            return `
                             <div class="def-box">
-                                <span>${d.term}:</span><p>${d.definition}</p>
+                                <span class="term-title">${d.term}:</span>
+                                <div class="def-text md-content">${inlineDef}</div>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>` : '';
 
                 const formulasHtml = (t.formulas && t.formulas.length > 0) ? `
                     <div style="margin-top: 14px;">
-                        ${t.formulas.map(f => `
+                        ${t.formulas.map(f => {
+                            const mathEq = (f.equation || '').includes('$') ? f.equation : `$$${f.equation}$$`;
+                            const inlineMean = marked.parseInline(f.meaning || '');
+                            return `
                             <div class="formula-box">
-                                <div class="eq">${f.equation}</div>
-                                <div class="meaning">${f.meaning}</div>
+                                <div class="eq md-content">${mathEq}</div>
+                                <div class="meaning md-content">${inlineMean}</div>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>` : '';
 
                 const derivationsHtml = (t.derivations && t.derivations.length > 0) ? `
                     <div style="margin-top: 14px;">
-                        ${t.derivations.map(d => `
+                        ${t.derivations.map(d => {
+                            const inlineTitle = marked.parseInline(d.title || '');
+                            const bodyContent = marked.parse(d.content || '');
+                            return `
                             <div class="deriv-box">
-                                <h5>${d.title}</h5>
-                                <pre>${d.content}</pre>
+                                <h5>${inlineTitle}</h5>
+                                <div class="deriv-content md-content">${bodyContent}</div>
                             </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>` : '';
 
-                const notesList = (t.notes || []).map(n => `<li>${n}</li>`).join('');
+                const notesList = (t.notes || []).map(n => {
+                    return `<li><div class="md-content" style="display:inline;">${marked.parseInline(n)}</div></li>`;
+                }).join('');
 
                 return `
                 <div class="note-card">
@@ -1061,6 +1121,9 @@ KAPARSH_FRONTEND = r"""
                     ${notesList ? `<ul class="note-list" style="margin-top:14px;">${notesList}</ul>` : ''}
                 </div>`;
             }).join('');
+
+            // Allow elements to attach to DOM before triggering KaTeX rendering
+            setTimeout(applyMath, 50);
         }
 
         function downloadNotes() {
@@ -1188,21 +1251,26 @@ KAPARSH_FRONTEND = r"""
             const container = document.getElementById('quiz-questions-container');
             document.getElementById('quiz-score-area').innerHTML = ''; 
 
-            container.innerHTML = AppState.quiz.map((q, index) => `
+            container.innerHTML = AppState.quiz.map((q, index) => {
+                const qsText = marked.parseInline(q.question || '');
+                return `
                 <div id="qcard-${index}" class="glass-card q-card">
                     <div class="q-label">QUESTION ${index + 1}</div>
-                    <div class="q-text">${q.question || 'Missing question'}</div>
+                    <div class="q-text md-content">${qsText}</div>
                     <div>
                         ${(q.options || []).map(opt => `
                             <label class="quiz-opt-label">
                                 <input type="radio" name="question-${index}" value="${opt.replace(/"/g, '&quot;')}">
-                                <span>${opt}</span>
+                                <span class="md-content">${marked.parseInline(opt)}</span>
                             </label>
                         `).join('')}
                     </div>
                     <div id="result-${index}"></div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
+            
+            setTimeout(applyMath, 50);
         }
 
         function checkAnswers() {
@@ -1217,25 +1285,29 @@ KAPARSH_FRONTEND = r"""
                     return;
                 }
                 
+                const explHtml = marked.parseInline(q.explanation || '');
                 if (selected.value === q.correct_answer) {
                     score++;
                     resultDiv.innerHTML = `
-                        <div class="quiz-res-box correct">
+                        <div class="quiz-res-box correct md-content">
                             <strong style="color: var(--success); display: block; margin-bottom: 4px;">Correct</strong>
-                            <span style="color: rgba(255,255,255,0.8);">${q.explanation}</span>
+                            <span style="color: rgba(255,255,255,0.8);">${explHtml}</span>
                         </div>`;
                     card.style.borderColor = 'rgba(50, 215, 75, 0.4)';
                 } else {
+                    const corrAns = marked.parseInline(q.correct_answer || '');
                     resultDiv.innerHTML = `
-                        <div class="quiz-res-box wrong">
+                        <div class="quiz-res-box wrong md-content">
                             <strong style="color: var(--danger); display: block; margin-bottom: 4px;">Incorrect</strong>
-                            <div style="font-size: 12px; margin-bottom: 6px;">Correct: <strong>${q.correct_answer}</strong></div>
-                            <span style="color: rgba(255,255,255,0.8);">${q.explanation}</span>
+                            <div style="font-size: 12px; margin-bottom: 6px;">Correct: <strong>${corrAns}</strong></div>
+                            <span style="color: rgba(255,255,255,0.8);">${explHtml}</span>
                         </div>`;
                     card.style.borderColor = 'rgba(255, 69, 58, 0.4)';
                 }
             });
             
+            setTimeout(applyMath, 50);
+
             if(document.querySelectorAll('input[type="radio"]:checked').length === AppState.quiz.length) {
                 document.getElementById('quiz-score-area').innerHTML = `
                     <div class="glass-card" style="text-align: center; margin-top: 24px; padding: 32px 16px;">
@@ -1258,7 +1330,7 @@ KAPARSH_FRONTEND = r"""
             if (!AppState.extractedText) return alert("Please upload and process a Chapter first to ask doubts.");
 
             const chatHistory = document.getElementById('chat-history');
-            chatHistory.innerHTML += `<div class="chat-bubble chat-user">${question}</div>`;
+            chatHistory.innerHTML += `<div class="chat-bubble chat-user md-content">${question}</div>`;
             input.value = '';
             
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -1282,9 +1354,14 @@ KAPARSH_FRONTEND = r"""
                 
                 if (!response.ok) throw new Error(data.detail || "Server Error");
                 
-                const formattedAnswer = data.answer.replace(/\n/g, '<br>');
-                chatHistory.innerHTML += `<div class="chat-bubble chat-ai">${formattedAnswer}</div>`;
+                // Parse markdown before injecting
+                const formattedAnswer = marked.parse(data.answer || "");
+                chatHistory.innerHTML += `<div class="chat-bubble chat-ai md-content">${formattedAnswer}</div>`;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
+                
+                // After adding to DOM, run math renderer
+                setTimeout(applyMath, 50);
+
             } catch (err) {
                 document.getElementById(loaderId).remove();
                 alert("Error: " + err.message);
