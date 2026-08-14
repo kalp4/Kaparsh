@@ -2,6 +2,7 @@ import os
 import time
 import tempfile
 import datetime
+import random
 from google import genai
 
 def get_gemini_client():
@@ -32,13 +33,15 @@ def cleanup_old_files(client):
         print(f"Cleanup non-fatal error: {e}")
 
 def upload_and_wait_active(client, upload_file):
-    try:
-        # Free up storage before performing new upload
-        cleanup_old_files(client)
-    except Exception as e:
-        if "403" in str(e) or "PERMISSION_DENIED" in str(e):
-             raise Exception("API Key Error (403): Your Gemini API Key lacks permission. Ensure Google Cloud Console 'Application Restrictions' are set to 'None' for backend usage.")
-        print(f"Cleanup non-fatal error: {e}")
+    # Only run cleanup 10% of the time to avoid triggering Google's 403 abuse flags from spamming files.list()
+    if random.random() < 0.10:
+        try:
+            cleanup_old_files(client)
+        except Exception as e:
+            if "403" in str(e) or "PERMISSION_DENIED" in str(e):
+                 print("Cleanup skipped: API Key lacks permission or is flagged.")
+            else:
+                 print(f"Cleanup non-fatal error: {e}")
         
     # Reset stream pointer to start
     upload_file.seek(0)
@@ -61,12 +64,13 @@ def upload_and_wait_active(client, upload_file):
             elif state_str == "FAILED":
                 raise Exception("Gemini File processing failed on Google's servers.")
                 
-            time.sleep(2)
+            # Increased sleep to 5 seconds to prevent rate-limit and abuse flags
+            time.sleep(5)
             
         return gemini_file.name
     except Exception as e:
         if "403" in str(e) or "PERMISSION_DENIED" in str(e):
-            raise Exception("API Key Error (403): Your Gemini API Key lacks permission. Please remove 'Website' or 'HTTP Referrer' restrictions in the Google Cloud Console. Backend Python servers cannot use web-restricted keys.")
+            raise Exception("API Key Error (403): Your account is temporarily flagged for API abuse due to frequent uploads. Check Google AI Studio for billing alerts, or wait for the flag to clear.")
         raise e
     finally:
         if os.path.exists(temp_path):
