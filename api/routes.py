@@ -40,7 +40,7 @@ def analyze_pdf():
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=[prompt, gemini_file],
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         
         parsed_data = json.loads(response.text)
@@ -81,7 +81,7 @@ def parse_syllabus():
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=[prompt, gemini_file],
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         
         parsed = json.loads(response.text)
@@ -136,7 +136,7 @@ def get_topic_details():
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.2)
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         
         return jsonify(json.loads(response.text))
@@ -211,7 +211,7 @@ def generate_schedule():
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.3)
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         return jsonify(json.loads(response.text))
         
@@ -245,7 +245,7 @@ def generate_quiz():
         response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.3)
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         return jsonify(json.loads(response.text))
         

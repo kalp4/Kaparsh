@@ -12,35 +12,32 @@ def get_gemini_client():
 
 def cleanup_old_files(client):
     """
-    Garbage collector to prevent 403 Storage Quota limits.
-    Deletes files older than 2 hours from Gemini's servers.
+    Deletes files older than 2 hours from Gemini storage to prevent hitting 403 / storage quota limits.
     """
     try:
         now = datetime.datetime.now(datetime.timezone.utc)
         for f in client.files.list():
             if hasattr(f, 'create_time') and f.create_time:
                 create_time = f.create_time
-                # Ensure the datetime object is timezone-aware
                 if create_time.tzinfo is None:
                     create_time = create_time.replace(tzinfo=datetime.timezone.utc)
                 
                 age = now - create_time
-                
-                # 7200 seconds = 2 hours.
                 if age.total_seconds() > 7200:
                     try:
                         client.files.delete(name=f.name)
                     except Exception:
                         pass
     except Exception as e:
-        # Failsafe: if cleanup fails, don't crash the actual upload request
-        print(f"Cleanup error (non-fatal): {e}")
+        print(f"Cleanup non-fatal error: {e}")
 
 def upload_and_wait_active(client, upload_file):
-    # 1. Clean up old files before uploading new ones to free up API quota
+    # Free up storage before performing new upload
     cleanup_old_files(client)
     
-    # 2. Proceed with standard upload
+    # Reset stream pointer to start
+    upload_file.seek(0)
+    
     temp_dir = "/tmp" if os.path.exists("/tmp") else tempfile.gettempdir()
     os.makedirs(temp_dir, exist_ok=True)
     temp_path = os.path.join(temp_dir, upload_file.filename)
