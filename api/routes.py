@@ -5,6 +5,12 @@ from services.gemini_service import get_gemini_client, upload_and_wait_active
 
 api_bp = Blueprint('api', __name__)
 
+def handle_google_api_error(e, context="Operation"):
+    err_str = str(e)
+    if "403" in err_str or "PERMISSION_DENIED" in err_str:
+        return jsonify({"detail": f"{context} failed (403): API Key permission denied. Please verify your API Key in Vercel has 'Application Restrictions' set to 'None' in Google Cloud Console."}), 500
+    return jsonify({"detail": f"{context} failed: {err_str}"}), 500
+
 @api_bp.route("/health", methods=["GET"])
 def health_check():
     return jsonify({"status": "Kaparsh Flask Backend is Live and Ready!"})
@@ -51,7 +57,7 @@ def analyze_pdf():
         })
         
     except Exception as e:
-        return jsonify({"detail": f"File Analysis failed: {str(e)}"}), 500
+        return handle_google_api_error(e, "File Analysis")
 
 @api_bp.route("/parse-syllabus", methods=["POST"])
 def parse_syllabus():
@@ -96,7 +102,7 @@ def parse_syllabus():
         })
         
     except Exception as e:
-        return jsonify({"detail": f"Syllabus parsing failed: {str(e)}"}), 500
+        return handle_google_api_error(e, "Syllabus parsing")
 
 @api_bp.route("/topic", methods=["POST"])
 def get_topic_details():
@@ -142,7 +148,7 @@ def get_topic_details():
         return jsonify(json.loads(response.text))
         
     except Exception as e:
-        return jsonify({"detail": f"Topic detailing failed: {str(e)}"}), 500
+        return handle_google_api_error(e, "Topic detailing")
 
 @api_bp.route("/schedule", methods=["POST"])
 def generate_schedule():
@@ -216,7 +222,7 @@ def generate_schedule():
         return jsonify(json.loads(response.text))
         
     except Exception as e:
-        return jsonify({"detail": f"Schedule generation failed: {str(e)}"}), 500
+        return handle_google_api_error(e, "Schedule generation")
 
 @api_bp.route("/quiz", methods=["POST"])
 def generate_quiz():
@@ -250,7 +256,7 @@ def generate_quiz():
         return jsonify(json.loads(response.text))
         
     except Exception as e:
-        return jsonify({"detail": f"Quiz generation failed: {str(e)}"}), 500
+        return handle_google_api_error(e, "Quiz generation")
 
 @api_bp.route("/doubt", methods=["POST"])
 def answer_doubt():
@@ -280,4 +286,4 @@ def answer_doubt():
         
         return jsonify({"answer": response.text})
     except Exception as e:
-        return jsonify({"detail": f"Failed to answer doubt: {str(e)}"}), 500
+        return handle_google_api_error(e, "Doubt answering")

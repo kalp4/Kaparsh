@@ -32,9 +32,14 @@ def cleanup_old_files(client):
         print(f"Cleanup non-fatal error: {e}")
 
 def upload_and_wait_active(client, upload_file):
-    # Free up storage before performing new upload
-    cleanup_old_files(client)
-    
+    try:
+        # Free up storage before performing new upload
+        cleanup_old_files(client)
+    except Exception as e:
+        if "403" in str(e) or "PERMISSION_DENIED" in str(e):
+             raise Exception("API Key Error (403): Your Gemini API Key lacks permission. Ensure Google Cloud Console 'Application Restrictions' are set to 'None' for backend usage.")
+        print(f"Cleanup non-fatal error: {e}")
+        
     # Reset stream pointer to start
     upload_file.seek(0)
     
@@ -59,6 +64,10 @@ def upload_and_wait_active(client, upload_file):
             time.sleep(2)
             
         return gemini_file.name
+    except Exception as e:
+        if "403" in str(e) or "PERMISSION_DENIED" in str(e):
+            raise Exception("API Key Error (403): Your Gemini API Key lacks permission. Please remove 'Website' or 'HTTP Referrer' restrictions in the Google Cloud Console. Backend Python servers cannot use web-restricted keys.")
+        raise e
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
