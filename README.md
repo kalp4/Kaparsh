@@ -2,7 +2,7 @@
 
 Let’s be real for a second: staring down a dense, 50-page textbook chapter while trying to guess what will *actually* be on the test is exhausting. You highlight a whole page, zone out, and suddenly realize you haven't retained a single word. 
 
-I built **Kaparsh** to solve exactly that. Think of it as a smart, tireless study companion that takes your heavy, raw study materials and turns them into clean notes, beautiful formula sheets, and custom practice quizzes. 
+We built **Kaparsh** to solve exactly that. Think of it as a smart, tireless study companion that takes your heavy, raw study materials and turns them into clean notes, beautiful formula sheets, and custom practice quizzes. 
 
 The goal? To help you actually spend your time *learning* instead of just aggressively highlighting pages at 2 AM. 🌙
 
@@ -12,8 +12,8 @@ The goal? To help you actually spend your time *learning* instead of just aggres
 
 ### 1. Notes & Formulas
 Upload a PDF chapter or Upload a picture of your textbook. Tell the app your current grade and subject, and let it do its thing. The AI reads through the text and breaks it down into:
-*   **High-Yield Notes:** Short, punchy bullet points of the concepts that actually matter.
-*   **Formula Sheets:** Math and physics equations pulled out and beautifully formatted
+*   **High-Importance Notes:** Short, punchy bullet points of the concepts that actually matter.
+*   **Formula Sheets:** Math and physics equations pulled out and beautifully formatted.
 *   **Step-by-Step Derivations:** Proofs are kept in their own separate section so they don't clutter your main notes.
 *   **Smart Syllabus Tagging:** If the AI spots random trivia that isn't usually in your specific curriculum, it tucks it away under an `[EXTRA]` dropdown. You instantly know what to prioritize for the exam.
 
